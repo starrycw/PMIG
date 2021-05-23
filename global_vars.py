@@ -5,6 +5,8 @@
 # @File    : global_vars.py
 #
 
+import os
+
 # Functions
 def _init():
     '''
@@ -16,17 +18,33 @@ def _init():
     _global_dict = {}
     ########################################################################################
     # Pre-defined global variables
+    #
+    # Variables used to count warning messages
     set_value_ifundefined('cnt_warning', 0)
+
+    # Choose the amount of information to display:
+    # 0: ERRORs only
+    # 1: ERRORs and WARNINGs
+    # 2: ERRORs, WARNINGs, and INFOs
+    # 3: All
     set_value('echo_mode', 3)
-    set_path('path_main', '/home/elaina/Workspace/Projects/PyCharm/Polymorphic-MIG-dev-pre')
-    set_path('path_abc_srcdir', get_value('path_main') + '/examples')
-    set_path('path_aiger_dir', get_value('path_main') + '/tools/aiger')
+
+    # Working dictionary:
+    # os.path.realpath(__file__))[0] is the path of this file
+    set_path('path_main', os.path.split(os.path.realpath(__file__))[0])
+    if get_value('echo_mode') > 2:
+        print("[INFO] global_vars: Set path_main to", get_value('path_main') )
+
+    # User-defined Variables
+    set_path('path_abc_srcdir', get_value('path_main') + '/examples') # The ABC program reads source files from 'path_abc_srcdir'
+    set_path('path_aiger_dir', get_value('path_main') + '/tools/aiger') # The AIGER tools read source files from 'path_aiger_dir'
     ########################################################################################
     return 0
 
 def set_value(name, value):
     '''
-    Create or modify a global variable
+    Create or modify a global variable.
+    (Stored in _global_dict)
 
     :param name: String - Variable name
     :param value: Any - Variable value
@@ -37,7 +55,8 @@ def set_value(name, value):
 
 def set_path(name, value):
     '''
-    Create or modify a global path variable
+    Create or modify a global path variable.
+    (Stored in _global_dict)
 
     :param name: String - Variable name. (It is recommended to start with "path_" )
     :param value: String - New path
@@ -59,6 +78,7 @@ def set_path(name, value):
 def set_value_ifundefined(name, value):
     '''
     Create and modify a global variable only if it does not defined
+    (Stored in _global_dict)
 
     :param name: String - Variable name
     :param value: Any - Variable value
@@ -70,6 +90,7 @@ def set_value_ifundefined(name, value):
 def set_cnt(name, add_value):
     '''
     Create or modify a global counter. It will be defined first if not yet.
+    (Stored in _global_dict)
 
     :param name: String - Cnt name
     :param add_value: Int - 0 (Reset to 0) or !0 (cnt = cnt + add_value).
@@ -86,7 +107,7 @@ def set_cnt(name, add_value):
 
 def get_value(name, defValue = None):
     '''
-    Get the value of a global variable. If it does not exist, return defValue.
+    Get the value of a variable stored in _global_dict(dictionary, global). If it does not exist, return defValue.
 
     :param name: String - Variable name
     :param defValue: Any - The value returned if the variable does not exist

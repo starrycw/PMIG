@@ -15,7 +15,8 @@ print(path_abc_srcdir)
 path_aiger_dir = g_vars.get_value("path_aiger_dir")
 
 # Set Variables
-path_abc_srcfile = "rca2.v"
+path_abc_srcfile = "ripple_64.blif"
 
-returntuple = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", "rewrite", "strash", "rewrite", "abc"), echo_mode)
-print(returntuple)
+status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("rewrite", "strash", "rewrite", "abc", "python"), echo_mode)
+print(status, warnings)
+

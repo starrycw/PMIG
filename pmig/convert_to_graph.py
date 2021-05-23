@@ -30,7 +30,7 @@ def convert_to_aiger(abc_srcdir, abc_srcfile, aiger_dir, abc_ops = ("strash", "r
     :param abc_ops: Tuple with strings - The operations performed by ABC, such as: ("strash", "rewrite").
     :param echo_mode: Int - 0 (ERRORs only); 1 (WARNINGs); 2 (INFOs); 3 (All).
 
-    :return: Tuple: (State, warningcnt): State=0 if no error occurred
+    :return: State, warningcnt: State=0 if no error occurred
     '''
 
     try:
@@ -96,7 +96,7 @@ def convert_to_aiger(abc_srcdir, abc_srcfile, aiger_dir, abc_ops = ("strash", "r
             # abc: Undefined op
             else:
                 if echo_mode > 0:
-                    print("[WARNING] abc: Undefined operation \"" + op + "\" is passed!")
+                    print("[WARNING] abc: Undefined operation \"" + op + "\"!")
                 warningcnt = warningcnt + 1
 
         # abc: Write .aig file
@@ -105,7 +105,7 @@ def convert_to_aiger(abc_srcdir, abc_srcfile, aiger_dir, abc_ops = ("strash", "r
             raise ReturnCodeError("abc: Failed to write aig file: " + abc_srcdir + '/' + abc_srcfile + ".aig" + " (" + msg + ")")
         else:
             if echo_mode > 1:
-                print("[INFO] abc: Save aig file to " + abc_srcdir + '/' + abc_srcfile + ".aig")
+                print("[INFO] abc: Save binary AIGER file (aig) to " + abc_srcdir + '/' + abc_srcfile + ".aig")
 
         # aigtoaig: convert aig to aag
         process_status = subprocess.run(aiger_dir + "/aigtoaig" + " " + abc_srcdir + '/' + abc_srcfile + ".aig " + \
@@ -118,11 +118,13 @@ def convert_to_aiger(abc_srcdir, abc_srcfile, aiger_dir, abc_ops = ("strash", "r
 
         # finally
         my_abc.Abc_Stop()
-        return (0, warningcnt)
+        if echo_mode > 2:
+            print("[INFO] convert_to_graph: Return with", warningcnt, "warning(s).")
+        return 0, warningcnt
 
     except Exception as e:
-        print("[ERROR] ", e)
-        return (1, warningcnt)
+        print("[ERROR] convert_to_graph: An error occurred! The details are as follows: \n       ", e)
+        return 1, warningcnt
 
     finally:
         my_abc.Abc_Stop()
