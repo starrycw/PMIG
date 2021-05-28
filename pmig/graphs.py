@@ -1330,3 +1330,498 @@ class _MIG_Node:
             type = 'ERROR'
 
         return "pmig.graphs._MIG_Node _type=" + type + ", _child0=" + str(self._child0) + ", _child1=" + str(self._child1) + ", _child2=" + str(self._child2)
+
+########################################################################################################################
+# class PMIG
+#
+# @Time    : 2021/5/27
+# @Author  : c
+#
+# Polymorphic MIG.
+#
+# Node:
+#     Each node is a instance of _MIG_Node. It may be CONST0-type, PI-type, MAJ-type, LATCH-type, or BUFFER-type.
+#     Nodes are stored in a list (_nodes), and each node is identified by the order in _nodes.
+#
+# Literal:
+#     Each literal consists of TWO PARTS:
+#     (1) The lowest TWO bits are the attributes attached to the output edge of node.
+#     (2) The other bits are the position in the list.
+#
+# Poly-edge:
+#     The meaning of the lowest TWO bits (L[1], L[0]) of a literal are as follows:
+#     (1) L[1]: L[1] = 1 if the literal represents an output edge with polymorphic attribute. L[1] = 0 if not.
+#     (2) L[0]: L[0] = 1 if the literal has negative attribute (in NORMAL mode if L[1] = 1). L[0] = 0 if not.
+#
+########################################################################################################################
+class PMIG:
+
+    # Latch Init
+    INIT_ZERO = _MIG_Node.INIT_ZERO
+    INIT_ONE = _MIG_Node.INIT_ONE
+    INIT_NON = _MIG_Node.INIT_NON
+
+    def __init__(self, name = None):
+        self._name = name # Name
+        self._strash = {} # Structural hashing table
+        self._pis = [] # Literals of PIs (positive and non-polyedged)
+        self._pos = [] # Literals of POs (positive and non-polyedged)
+        self._latches = [] # Literals of latches (positive and non-polyedged)
+        self._buffers = [] # Literals of buffers (positive and non-polyedged)
+        self._nodes = [] # _MIG_Node objs
+        self._name_to_id = {} # Name-to-ID mapping. (The ID here is actually positive non-polyedged literal!)
+        self._id_to_name = {} # ID-to-Name mapping. (The ID here is actually positive non-polyedged literal!)
+        self._po_to_name = {} # PO-to-Name mapping.
+        self._name_to_po = {} # Name-to-PO mapping.
+        self._fanouts = {}
+        self._polymorphic_edges = {} # Contains all the nodes with polymorphic-edge as child. The key is the id of node.
+                             # The value is an int from 0 to 7 and calculated as follows:
+                             # value = 1 * (child0 has p-edge attribute)
+                             #         + 2 * (child1 has p-edge attribute)
+                             #         + 4 * (child2 has p-edge attribute)
+        self._polymorphic_nodes = {} # Contains all the nodes with control signal as child. The key is the id of node.
+                             # The value is an int from 0 to 7 and calculated as follows:
+                             # value = 1 * (child0 is control signal PI)
+                             #         + 2 * (child1 control signal PI)
+                             #         + 4 * (child2 control signal PI)
+
+        self._nodes.append( _MIG_Node.make_const0() ) # The ID of CONST0 must be 0!
+
+    def deref(self, f):
+        '''
+        Get the node of a literal.
+
+        :param f: INT - Literal
+        :return: _MIG_Node - Node
+        '''
+        return self._nodes[ f >> 2 ]
+
+    def name(self):
+        '''
+        Get the name of this PMIG.
+
+        :return: ANY
+        '''
+        return self._name
+
+    # Attribute of literal
+    @staticmethod
+    def is_negated_literal(f):
+        '''
+        Return TRUE if the literal f has negated attribute.
+
+        :param f: INT - Literal
+        :return: Bool
+        '''
+        return (f & 1) != 0
+
+    @staticmethod
+    def is_polymorphic_literal(f):
+        '''
+        Return True if the literal f has polymorphic attribute.
+
+        :param f: INT - Literal
+        :return: Bool
+        '''
+        return (f & 2) != 0
+
+    @staticmethod
+    def get_positive_literal(f):
+        '''
+        Return the literal with positive attribute.
+
+        :param f: INT - Literal
+        :return: INT - Literal
+        '''
+        return (f & ~1)
+
+    @staticmethod
+    def get_normal_literal(f):
+        '''
+        Return the literal with non-polyedge attribute.
+
+        :param f: INT - Literal
+        :return: INT - Literal
+        '''
+        return (f & ~2)
+
+    @staticmethod
+    def get_positive_normal_literal(f):
+        '''
+        Return the literal with positive and non-polymorphic attribute.
+
+        :param f: INT - Literal
+        :return: INT - Literal
+        '''
+        return (f & ~3)
+
+    @staticmethod
+    def negate_literal_if(f, c):
+        '''
+        Invert the LSB of f if c is True.
+
+        :param f: INT - Literal
+        :param c: Bool
+        :return: INT - Literal
+        '''
+        if c:
+            return f ^ 1 # xor
+        else:
+            return f
+
+    @staticmethod
+    def negate_literal_if_negated(f, c):
+        '''
+        Invert the LSB of f if c is negated.
+
+        :param f: INT - Literal
+        :param c: INT - Literal
+        :return: INT - Literal
+        '''
+        return f ^ (c & 1)
+
+    @staticmethod
+    def polymorphic_literal_if(f, c):
+        '''
+        Invert the polymorphic flag of f if c is True.
+
+        :param f: INT - Literal
+        :param c: Bool
+        :return: INT - Literal
+        '''
+        if c:
+            return f ^ 2  # xor
+        else:
+            return f
+
+    @staticmethod
+    def polymorphic_literal_if_polyedged(f, c):
+        '''
+        Invert the polymorphic flag of f if c is polymorphic.
+
+        :param f: INT - Literal
+        :param c: INT - Literal
+        :return: INT - Literal
+        '''
+        return f ^ (c & 2)
+
+    # Names
+    def set_name(self, f, name):
+        '''
+        Set name of f. f should be a positive non-polyedged literal!
+
+        :param f: INT - A positive non-polyedged literal
+        :param name: STRING
+        :return:
+        '''
+        assert not self.is_negated_literal(f)
+        assert not self.is_polymorphic_literal(f)
+        assert name not in self._name_to_id
+        assert f not in self._id_to_name
+
+        self._name_to_id[name] = f
+        self._id_to_name[f] = name
+
+    def get_id_by_name(self, name):
+        '''
+        Get ID (The ID here is actually positive non-polymorphic literal!) by name.
+
+        :param name: STRING - Name
+        :return: INT - A positive non-polyedged literal
+        '''
+        return self._name_to_id[name]
+
+    def has_name(self, f):
+        '''
+        Return True if f has a name in _id_to_name.
+
+        :param f: INT - A positive non-polymorphic literal
+        :return: Bool
+        '''
+        return f in self._id_to_name
+
+    def name_exists(self, n):
+        '''
+        Return True if n has a name in _name_to_id.
+
+        :param n: STRING - Name
+        :return: Bool
+        '''
+        return n in self._name_to_id
+
+    def get_name_by_id(self, f):
+        '''
+        Get name by ID (The ID here is actually positive non-polymorphic literal!).
+
+        :param f: INT - A positive non-polymorphic literal
+        :return: STRING - Name
+        '''
+        return self._id_to_name[f]
+
+    def remove_name(self, f):
+        '''
+        Remove f (positive non-polymorphic literal) from _id_to_name and _name_to_id.
+
+        :param f: INT - A positive non-polymorphic literal
+        :return:
+        '''
+        assert self.has_name(f)
+        name = self.get_name_by_id(f)
+
+        del self._id_to_name[f]
+        del self._name_to_id[name]
+
+    def iter_names(self):
+        '''
+        Return self._id_to_name.items()
+
+        :return:
+        '''
+        return self._id_to_name.items()
+
+    def fill_pi_names(self, replace=False, template="I_{}"):
+        '''
+        Fill PI names
+
+        :param replace:
+        :param template: Template
+        :return:
+        '''
+
+        if replace:
+            for pi in self.get_pis():
+                if self.has_name(pi):
+                    self.remove_name(pi)
+
+        uid = 0
+
+        for pi in self.get_pis():
+            if not self.has_name(pi):
+                while True:
+                    name = template.format(uid)
+                    uid += 1
+                    if not self.name_exists(name):
+                        break
+                self.set_name(pi, name)
+
+    # PO names
+    def set_po_name(self, po, name):
+        assert 0 <= po < len(self._pos)
+        assert name not in self._name_to_po
+        assert po not in self._po_to_name
+
+        self._name_to_po[name] = po
+        self._po_to_name[po] = name
+
+    def get_po_by_name(self, name):
+        return self._name_to_po[name]
+
+    def po_has_name(self, po):
+        return po in self._po_to_name
+
+    def name_has_po(self, po):
+        return po in self._name_to_po
+
+    def remove_po_name(self, po):
+        assert self.po_has_name(po)
+        name = self.get_name_by_po(po)
+        del self._name_to_po[name]
+        del self._po_to_name[po]
+
+    def get_name_by_po(self, po):
+        return self._po_to_name[po]
+
+    def iter_po_names(self):
+        return ((po_id, self.get_po_fanin(po_id), po_name) for po_id, po_name in self._po_to_name.items())
+
+    def fill_po_names(self, replace=False, template="O_{}"):
+
+        if replace:
+            self._name_to_po.clear()
+            self._po_to_name.clear()
+
+        po_names = set(name for _, _, name in self.iter_po_names())
+
+        uid = 0
+        for po_id, _, _ in self.get_pos():
+            if not self.po_has_name(po_id):
+                while True:
+                    name = template.format(uid)
+                    uid += 1
+                    if name not in po_names:
+                        break
+                self.set_po_name(po_id, name)
+
+    # Create basic objects
+    def create_pi(self, name = None):
+        '''
+        Create a PI-type node.
+
+        :param name: STRING - Name
+        :return: INT - Literal of the node
+        '''
+        pi_id = len(self._pis)
+        n = _MIG_Node.make_pi(pi_id)
+        fn = len(self._nodes) << 2
+
+        self._nodes.append(n)
+        self._pis.append(fn)
+
+        if name is not None:
+            self.set_name(fn, name)
+
+        return fn
+
+    def create_latch(self, name = None, init = INIT_ZERO, next = None):
+        '''
+        Create a LATCH-type node.
+
+        :param name: STRING - Name
+        :param init: INT - Init state
+        :param next: INT - Next state
+        :return: INT - Literal of the node
+        '''
+        l_id = len(self._latches)
+        n = _MIG_Node.make_latch(l_id, init, next)
+        fn = len(self._nodes) << 2
+
+        self._nodes.append(n)
+        self._latches.append(fn)
+
+        if name is not None:
+            self.set_name(fn, name)
+
+        return fn
+
+    def create_maj(self, child0, child1, child2):
+        '''
+        Create a MAJ-type node.
+        It should be noted that:
+        before calling this method, additional checks are required to avoid redundant node being created.
+
+        :param child0: INT - Child 0
+        :param child1: INT - Child 1
+        :param child2: INT - Child 2
+        :return: INT - Literal of the node
+        '''
+        # Literal constraint: child0 < child1 < child2
+        if child0 > child1:
+            child0, child1 = child1, child0
+        if child1 > child2:
+            child1, child2 = child2, child1
+        if child0 > child1:
+            child0, child1 = child1, child0
+
+        # Redundant node
+        if child0 == child1:
+            return child0
+        if child1 == child2:
+            return child1
+        if child2 == child0:
+            return child2
+        if child0 == PMIG.negate_literal_if(child1, True):
+            return child2
+        if child1 == PMIG.negate_literal_if(child2, True):
+            return child0
+        if child2 == PMIG.negate_literal_if(child0, True):
+            return child1
+
+        # Structural hashing
+        key = (_MIG_Node.MAJ, child0, child1, child2)
+        if key in self._strash:
+            return self._strash[key]
+
+        fn = len(self._nodes) << 2
+        n = _MIG_Node.make_maj(child0, child1, child2)
+        self._nodes.append(n)
+        self._strash[key] = fn
+        return fn
+
+    def create_buffer(self, buf_in = 0, name = None):
+        '''
+        Create a BUFFER-type node.
+
+        :param buf_in: INT - Input of buffer
+        :param name: STRING - Name
+        :return: INT - Literal of the buffer
+        '''
+        buf_id = len(self._buffers)
+        fn = len(self._nodes) << 2
+        n = _MIG_Node.make_buffer(buf_id, buf_in)
+
+        self._nodes.append(n)
+        self._buffers.append(fn)
+
+        if name is not None:
+            self.set_name(fn, name)
+
+        return fn
+
+    def convert_buf_to_pi(self, buf_id):
+        '''
+        Convert a BUFFER-type node to PI-type node.
+
+        :param buf_id: Literal of buffer
+        :return:
+        '''
+        assert self.is_buffer(buf_id)
+        assert self.get_buffer_in(buf_id) >= 0
+
+        n = self.deref(buf_id)
+        self._buffers[n.get_buf_id()] = -1
+        n.convert_buf_to_pi(len(self._pis))
+        self._pis.append(buf_id)
+
+    def create_po(self, f = 0, name = None, po_type = 0):
+        '''
+        Create PO.
+
+        :param f:
+        :param name:
+        :param po_type:
+        :return:
+        '''
+        po_id = len(self._pos)
+        self._pos.append( (f, po_type) )
+
+        if name is not None:
+            self.set_po_name(po_id, name)
+
+        return po_id
+
+    # The PO types are not defined in current version!
+    #
+    # def create_justice:
+    #
+    # def remove_justice:
+
+
+    # Query IDs
+
+
+
+    # PIs
+
+
+    # Latches
+
+
+    # MAJ
+
+
+    # Buffers
+    def get_buffer_in:
+
+    # Fanins
+
+
+    # PO fanins
+
+
+    # Higher-level boolean ops
+
+
+    # Object numbers
+
+
+    # Object access as iterators (use list() to get a copy)
