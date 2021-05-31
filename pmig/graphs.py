@@ -1368,7 +1368,7 @@ class PMIG:
         self._name = name # Name
         self._strash = {} # Structural hashing table
         self._pis = [] # Literals of PIs (positive and non-polyedged)
-        self._pos = [] # Literals of POs (positive and non-polyedged)
+        self._pos = [] # (Literal, type)
         self._latches = [] # Literals of latches (positive and non-polyedged)
         self._buffers = [] # Literals of buffers (positive and non-polyedged)
         self._nodes = [] # _MIG_Node objs
@@ -1512,6 +1512,80 @@ class PMIG:
         :return: INT
         '''
         return len(self._polymorphic_nodes)
+
+    # Object access as iterators (use list() to get a copy)
+    def get_iter_pis(self):
+        '''
+        Return iterator of PIs (Positive and non-polymorphic literal)
+
+        :return: ITERATOR: INT - Literal
+        '''
+        return ( i << 2 for i, n in enumerate(self._nodes) if n.is_pi() )
+
+    def get_iter_pos(self):
+        '''
+        Return iterator of POs: (po_id: Order in self._pos, po_fanin: Fan-in literal, po_type: PO type).
+
+        :return: ITERATOR: TUPLE - (po_id, po_fanin, po_type)
+        '''
+        return ((po_id, po_fanin, po_type) for po_id, (po_fanin, po_type) in enumerate(self._pos))
+
+    def get_iter_pos_by_type(self, i_type):
+        '''
+        Return iterator of POs: (po_id: Order in self._pos, po_fanin: Fan-in literal, po_type == i_type: PO type).
+
+        :return: ITERATOR: TUPLE - (po_id, po_fanin, po_type == i_type)
+        '''
+        return ((po_id, po_fanin, po_type) for po_id, po_fanin, po_type in self.get_iter_pos() if po_type == i_type)
+
+    def get_iter_po_fanins(self):
+        '''
+        Return iterator of fan-ins (positive and non-polymorphic literals) of PO
+
+        :return: ITERATOR: INT - Literal
+        '''
+        return ( po_fanin for po_id, po_fanin, po_type in self.get_iter_pos() )
+
+    def get_iter_po_fanins_by_type(self, i_type):
+        '''
+        Return iterator of fan-ins (positive and non-polmorphic literals) of 'i-type' PO.
+
+        :param i_type: ITERATOR: INT - Literal
+        :return:
+        '''
+        return ( po_fanin for po_id, po_fanin, po_type in self.get_iter_pos_by_type(i_type) )
+
+    def get_iter_latches(self):
+        '''
+        Return iterator of LATCHs (Positive and non-polymorphic literal)
+
+        :return: ITERATOR: INT - Literal
+        '''
+        return ( l for l in self._latches )
+
+    def get_iter_buffers(self):
+        '''
+        Return iterator of BUFFERs (Positive and non-polymorphic literal)
+
+        :return: ITERATOR: INT - Literal
+        '''
+        return ( b for b in self._buffers if b >= 0 )
+
+    def get_iter_majs(self):
+        '''
+        Return iterator of MAJs (Positive and non-polymorphic literal)
+
+        :return: ITERATOR: INT - Literal
+        '''
+        return ( i << 2 for i, n in enumerate(self._nodes) if n.is_maj() )
+
+    def get_iter_nonterminals(self):
+        '''
+        Return iterator of non-terminal nodes (Positive and non-polymorphic literal).
+
+        :return: ITERATOR: INT - Literal
+        '''
+        return ( i << 2 for i, n in enumerate(self._nodes) if n.is_nonterminal() )
 
     # _polymorphic_edges
     def polymorphic_edgesdict_add(self, p_id, p_type, p_value):
@@ -2429,22 +2503,10 @@ class PMIG:
         '''
         return self.create_or( self.negate_literal_if(a_in, True), b_in )
 
+    # Python special methods
+    def __len__(self):
+        return len(self._nodes)
 
 
 
-    # Object access as iterators (use list() to get a copy)
-    def get_iter_pos(self):
-        '''
-        Return iterator of POs in self._pos
 
-        :return: ITERATOR: TUPLE - (po_id, po_fanin, po_type)
-        '''
-        return ( (po_id, po_fanin, po_type) for po_id, (po_fanin, po_type) in enumerate(self._pos) )
-
-    def get_iter_pos_by_type(self, i_type):
-        '''
-        Return iterator of POs with 'i_type' self._pos.
-
-        :return: ITERATOR: TUPLE - (po_id, po_fanin, po_type)
-        '''
-        return ( (po_id, po_fanin, po_type) for po_id, po_fanin, po_type in self.get_iter_pos() if po_type == i_type )
