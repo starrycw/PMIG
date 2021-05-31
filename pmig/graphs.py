@@ -1827,6 +1827,48 @@ class PMIG:
         '''
         return f ^ (c & 2)
 
+    @staticmethod
+    def negate_maj_fanins_literal_if(child0, child1, child2, c):
+        '''
+        Return a tuple containing the literal of child0~child2, and the three literals are negated if c is True.
+
+        :param child0: INT - Literal
+        :param child1: INT - Literal
+        :param child2: INT - Literal
+        :param c: Bool
+        :return: TUPLE: (INT, INT, INT)
+        '''
+        return (PMIG.negate_literal_if(child0, c), PMIG.negate_literal_if(child1, c), PMIG.negate_literal_if(child2, c))
+
+    @staticmethod
+    def polymorphic_maj_fanins_literal_if(child0, child1, child2, c):
+        '''
+        Return a tuple containing the literal of child0~child2, and the three literals are polymorphic-ed if c is True.
+
+        :param child0: INT - Literal
+        :param child1: INT - Literal
+        :param child2: INT - Literal
+        :param c: Bool
+        :return:TUPLE: (INT, INT, INT)
+        '''
+        return (PMIG.polymorphic_literal_if(child0, c), PMIG.polymorphic_literal_if(child1, c), PMIG.polymorphic_literal_if(child2, c) )
+
+    @staticmethod
+    def negate_and_polymorphic_maj_fanins_literal_if(child0, child1, child2, c):
+        '''
+        Return a tuple containing the literal of child0~child2, and the three literals are negated and polymorphic-ed if c is True.
+
+        :param child0: INT - Literal
+        :param child1: INT - Literal
+        :param child2: INT - Literal
+        :param c: Bool
+        :return: TUPLE: (INT, INT, INT)
+        '''
+        child0_ne, child1_ne, child2_ne = PMIG.negate_maj_fanins_literal_if(child0, child1, child2, c)
+        child0_ne_po, child1_ne_po, child2_ne_po = PMIG.polymorphic_maj_fanins_literal_if(child0_ne, child1_ne, child2_ne, c)
+        return (child0_ne_po, child1_ne_po, child2_ne_po)
+
+
     # Names
     def set_name(self, f, name):
         '''
@@ -2022,6 +2064,8 @@ class PMIG:
 
     def create_maj(self, child0, child1, child2):
         '''
+        WARNING: Use get_maj_with_additional_checks instead of this function if you want to get a literal representing MAJ(child0, child1, child2)!
+
         Create a MAJ-type node.
         It should be noted that:
         before calling this method, additional checks are required to avoid redundant node being created.
@@ -2070,6 +2114,46 @@ class PMIG:
             self.polymorphic_edgesdict_add(fn, _MIG_Node.MAJ, pchild_value)
 
         return fn
+
+    def get_maj_with_additional_checks(self, child0, child1, child2):
+        '''
+        Return the literal of Y = MAJ(child0, child1, child2).
+        If MAJ(child0, child1, child2) can be implemented by an existing node with additional 'negated' and 'polymorphic' attributes, then return the corresponding literal.
+        If not, create a new MAJ node.
+
+        :param child0: INT - Literal
+        :param child1: INT - Literal
+        :param child2: INT - Literal
+        :return: INT - Literal
+        '''
+
+        if child0 > child1:
+            child0, child1 = child1, child0
+        if child1 > child2:
+            child1, child2 = child2, child1
+        if child0 > child1:
+            child0, child1 = child1, child0
+
+        # Additional structural hashing checks
+        child0_ne, child1_ne, child2_ne = self.negate_maj_fanins_literal_if(child0, child1, child2, c)
+        key_negated = (_MIG_Node.MAJ, child0_ne, child1_ne, child2_ne)
+        if key_negated in self._strash:
+            return self.negate_literal_if( self._strash[key_negated], True)
+
+        child0_po, child1_po, child2_po = self.polymorphic_maj_fanins_literal_if(child0, child1, child2, c)
+        key_polyed = (_MIG_Node.MAJ, child0_po, child1_po, child2_po)
+        if key_polyed in self._strash:
+            return self.polymorphic_literal_if( self._strash[key_polyed], True )
+
+        child0_ne_po, child1_ne_po, child2_ne_po = self.negate_and_polymorphic_maj_fanins_literal_if(child0, child1, child2, True)
+        key_negated_polyed = (_MIG_Node.MAJ, child0_ne_po, child1_ne_po, child2_ne_po)
+        if key_negated_polyed in self._strash:
+            return self.polymorphic_literal_if( self.negate_literal_if(self._strash[key_negated_polyed, True]), True )
+
+        return self.create_maj(child0, child1, child2)
+
+
+
 
     def create_buffer(self, buf_in = 0, name = None):
         '''
