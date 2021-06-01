@@ -2204,7 +2204,7 @@ class PMIG:
             self.polymorphic_nodesdict_delete(buf_id)
             self.polymorphic_edgesdict_delete(buf_id)
 
-    def create_po(self, f = 0, name = None, po_type = 0):
+    def create_po(self, f = 0, name = None, po_type = PO_OUTPUT):
         '''
         Create PO.
 
