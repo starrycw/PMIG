@@ -4,6 +4,8 @@
 # @Author  : c
 # @File    : test.py
 
+import sys
+sys.path.append("..")
 import global_vars as g_vars
 g_vars._init()
 from pmig import convert_to_graph
