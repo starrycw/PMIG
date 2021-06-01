@@ -1364,6 +1364,10 @@ class PMIG:
     INIT_ONE = _MIG_Node.INIT_ONE
     INIT_NON = _MIG_Node.INIT_NON
 
+    # PO types
+    PO_OUTPUT = 0
+    PO_UNSUPPORTED = 1
+
     def __init__(self, name = None):
         self._name = name # Name
         self._strash = {} # Structural hashing table
@@ -2590,6 +2594,214 @@ class PMIG:
     # Python special methods
     def __len__(self):
         return len(self._nodes)
+
+    # Convert AIG to PMIG
+    @staticmethod
+    def convert_aig_to_pmig(aig_obj, mig_name = None, allow_modification = False, allow_latch = False, allow_buffer = True, echo_mode = 3):
+        '''
+        - Param: allow_modification:
+
+        -- False (Default) - Report an error if an unsupported feature is detected.
+
+        -- True - If and unsupported feature is detected, try to fix it without changing the basic logic function.
+
+        - The allowed modifications include:
+
+        -- Convert unsupported po types to PMIG.PO_UNSUPPORTED
+
+        - Param: allow_latch:
+
+        -- Flase (Default) - No
+
+        -- True - Yes
+
+        - Param: allow_buffer:
+
+        -- True (Default) - Yes
+
+        -- False - Yes
+
+        :param aig_obj: AIG obj
+        :param mig_name: STRING - MIG name
+        :param allow_modification: Bool
+        :param allow_latch: Bool
+        :param allow_buffer: Bool
+        :param echo_mode: INT
+        :return: PMIG obj
+        '''
+
+        if echo_mode > 1: print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Start the conversion from [ AIG:",  aig_obj._name,\
+                          "] to [ PMIG:", mig_name, "] ......")
+        # Variables
+        ALLOWED_AIG_PO_TYPE = {AIG.OUTPUT: PMIG.PO_OUTPUT, "unsupported": PMIG.PO_UNSUPPORTED}
+        ADDITIONAL_CHECKS = True
+
+        # Literal convertion tools
+        def fanin_literal_aig_to_pmig(aig_fanin_literal):
+            return ( aig_obj.negate_if_negated(aig_fanin_literal, aig_fanin_literal) << 1 ) + ( aig_fanin_literal & 1 )
+
+        # Some checks
+        assert isinstance(aig_obj, AIG)
+        assert aig_obj._nodes[0].is_const0()
+
+        # Create an PMIG obj
+        pmig_obj = PMIG(name=mig_name)
+
+        # Convert _AIG_Node to _MIG_Node
+        for node_i, node_n in enumerate(aig_obj._nodes):
+            assert isinstance(node_n, _AIG_Node)
+            assert not ( node_n.is_const0() and node_i > 0)
+            # CONST0
+            if node_n.is_const0():
+                assert node_i == 0
+
+            # PI
+            elif node_n.is_pi():
+                pi_id = node_n.get_pi_id()
+                pi_name = None
+                pi_literal = node_i << 2
+                if aig_obj.has_name( pi_literal >> 1 ):
+                    pi_name = aig_obj.get_name_by_id( pi_literal >> 1)
+
+                return_literal = pmig_obj.create_pi(name=pi_name)
+                if echo_mode > 1:
+                    print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Convert PI", pi_id, "of AIG (", aig_obj._name,\
+                          ") to PI of PMIG (", mig_name, "). Literal:", aig_obj._pis[pi_id], "-->", return_literal, ". Name:", pi_name)
+
+                # Checks
+                if ADDITIONAL_CHECKS:
+                    assert pmig_obj._pis[-1] == pi_literal
+                    assert return_literal == pi_literal
+                    assert pmig_obj.n_pis() == pi_id + 1
+                    assert aig_obj._pis[pi_id] == return_literal >> 1
+
+            # LATCH
+            elif node_n.is_latch():
+                assert allow_latch, "[ERROR] pmig/graph/PMIG.convert_aig_to_mig: Latch-type node is not allowed!"
+
+                latch_init_new = PMIG.INIT_ZERO
+                if node_n.get_latch_init() == AIG.INIT_ONE:
+                    latch_init_new = PMIG.INIT_ONE
+                elif node_n.get_latch_init() == AIG.INIT_NONDET:
+                    latch_init_new = PMIG.INIT_NON
+
+                latch_next_aig = node_n.get_latch_next()
+                latch_next_new = fanin_literal_aig_to_pmig(latch_next_aig)
+                latch_id = node_n.get_latch_id()
+                latch_name = None
+                latch_literal = node_i << 2
+                if aig_obj.has_name( latch_literal >> 1 ):
+                    latch_name = aig_obj.get_name_by_id(latch_literal >> 1)
+
+                return_literal = pmig_obj.create_latch(name=latch_name, init=latch_init_new, next=latch_next_new)
+
+                if echo_mode > 1:
+                    print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Convert LATCH", latch_id, "of AIG (", aig_obj._name,\
+                          ") to LATCH of PMIG (", mig_name, "). Literal:", aig_obj._latches[latch_id], "-->", return_literal, \
+                          ". Next state literal:", latch_next_aig, "-->", latch_next_new, ". Name:", latch_name)
+
+                # Checks
+                if ADDITIONAL_CHECKS:
+                    assert pmig_obj._latches[-1] == latch_literal
+                    assert return_literal == latch_literal
+                    assert pmig_obj.n_latches() == latch_id + 1
+                    assert aig_obj._latches[latch_id] == return_literal >> 1
+                    assert fanin_literal_aig_to_pmig(node_n.get_latch_next()) == latch_next_new
+
+            # AND to MAJ
+            elif node_n.is_and():
+                and_left = node_n.get_left()
+                and_right = node_n.get_right()
+                and_literal = node_i << 2
+                maj_child0 = fanin_literal_aig_to_pmig(and_left)
+                maj_child1 = fanin_literal_aig_to_pmig(and_right)
+
+                return_literal = pmig_obj.create_maj(maj_child0, maj_child1, pmig_obj.get_literal_const0())
+
+                and_name = None
+                if aig_obj.has_name(and_literal >> 1):
+                    and_name = aig_obj.get_name_by_id(and_literal >> 1)
+                    aig_obj.set_name(return_literal, and_name)
+
+                if echo_mode > 1:
+                    print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Convert AND of AIG (", aig_obj._name,\
+                          ") to MAJ of PMIG (", mig_name, "). Literal:", node_i << 1, "-->", return_literal, \
+                          ". Fan-ins:", (and_left, and_right), "-->", pmig_obj.get_maj_fanins(return_literal), ". Name:", and_name)
+
+                # Checks
+                if ADDITIONAL_CHECKS:
+                    assert return_literal == node_i << 2
+                    assert pmig_obj._nodes[node_i].is_maj()
+                    assert fanin_literal_aig_to_pmig(and_left) == pmig_obj.get_maj_child2(return_literal)
+                    assert fanin_literal_aig_to_pmig(and_right) == pmig_obj.get_maj_child1(return_literal)
+                    assert pmig_obj.get_maj_child0(return_literal) == 0
+
+            # Buffer
+            elif node_n.is_buffer():
+                assert allow_buffer, "[ERROR] pmig/graph/PMIG.convert_aig_to_mig: Buffer-type node is not allowed!"
+
+                buffer_id = node_n.get_buf_id()
+                buffer_in_aig = node_n.get_buf_in()
+                buffer_in_new = fanin_literal_aig_to_pmig(buffer_in_aig)
+                buffer_name = None
+                buffer_literal = node_i << 2
+                if aig_obj.has_name(buffer_literal >> 1):
+                    buffer_name = aig_obj.get_name_by_id(buffer_literal >> 1)
+
+                return_literal = pmig_obj.create_buffer(buf_in=buffer_in_new, name=buffer_name)
+
+                if echo_mode > 1:
+                    print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Convert BUFFER", buffer_id, "of AIG (", aig_obj._name,\
+                          ") to BUFFER of PMIG (", mig_name, "). Literal:", aig_obj._buffers[buffer_id], "-->", return_literal, \
+                          ". Fan-in literal:", node_n.get_fanins()[0], "-->", buffer_in_new, ". Name:", buffer_name)
+
+                # Checks
+                if ADDITIONAL_CHECKS:
+                    assert pmig_obj._buffers[-1] == buffer_literal
+                    assert return_literal == buffer_literal
+                    assert pmig_obj.n_buffers() == buffer_id + 1
+                    assert fanin_literal_aig_to_pmig(node_n.get_fanins()[0]) == buffer_in_new
+
+            # Unknown
+            else:
+                assert False, "[ERROR] pmig/graph/PMIG.convert_aig_to_mig: Unknown node type!"
+
+        # Convert PO
+        for po_id, po_fanin, po_type_aig in aig_obj.get_pos():
+            # PO type
+            if po_type_aig not in ALLOWED_AIG_PO_TYPE:
+                if allow_modification:
+                    po_type_new = ALLOWED_AIG_PO_TYPE["unsupported"]
+                else:
+                    assert False, "[ERROR] pmig/graph/PMIG.convert_aig_to_mig: Unsupport PO type!"
+            else:
+                po_type_new = ALLOWED_AIG_PO_TYPE[po_type_aig]
+
+            # PO fan-in
+            po_fanin_new = fanin_literal_aig_to_pmig(po_fanin)
+
+            po_name = None
+            if aig_obj.po_has_name(po_id):
+                po_name = aig_obj.get_name_by_po(po_id)
+            return_id = pmig_obj.create_po(f=po_fanin_new, name=po_name, po_type = po_type_new)
+
+            if echo_mode > 1:
+                print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Convert PO", po_id, "of AIG (",aig_obj._name, \
+                      ") to PO of PMIG (", mig_name, "). Fan-in literal:", po_fanin, "-->", po_fanin_new, \
+                      ". Type:", po_type_aig, "-->", po_type_new, ". Name:", po_name)
+
+            # Checks
+            if ADDITIONAL_CHECKS:
+                assert return_id == po_id
+                assert pmig_obj._pos[-1] == (po_fanin_new, po_type_new)
+                assert pmig_obj.n_pos() == po_id + 1
+                assert pmig_obj._pos[po_id][0] == fanin_literal_aig_to_pmig(po_fanin)
+
+
+        if echo_mode > 1: print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Conversion from [ AIG:",  aig_obj._name,\
+                          "] to [ PMIG:", mig_name, "] is completed!")
+        return pmig_obj
+
 
 
 
