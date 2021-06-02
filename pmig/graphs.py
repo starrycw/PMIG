@@ -1399,6 +1399,61 @@ class PMIG:
 
         self._nodes.append( _MIG_Node.make_const0() ) # The ID of CONST0 must be 0!
 
+    # self._strash
+    def attribute_strash_if_exist(self, key):
+        return key in self._strash
+
+    def attribute_strash_get(self, key):
+        return self._strash.get(key)
+
+    def attribute_strash_add(self, key, value):
+        assert not self.attribute_strash_if_exist(key)
+        self._strash[key] = value
+
+    # self._pis
+    def attribute_pis_get(self, n):
+        return self._pis[n]
+
+    def attribute_pis_append(self, value):
+        return self._pis.append(value)
+
+    # self._pos
+    def attribute_pos_get(self, n):
+        return self._pos[n]
+
+    def attribute_pos_append(self, value):
+        return self._pos.append(value)
+
+    def attribute_pos_set(self, n, value):
+        self._pos[n] = value
+
+    # self._latches
+    def attribute_latches_get(self, n):
+        return self._latches[n]
+
+    def attribute_latches_append(self, value):
+        self._latches.append(value)
+
+    # self._buffers
+    def attribute_buffers_get(self, n):
+        return self._buffers[n]
+
+    def attribute_buffers_append(self, value):
+        self._buffers.append(value)
+
+    def attribute_buffers_set(self, n, value):
+        self._buffers[n] = value
+
+    # self._nodes
+    def attribute_nodes_get(self, n):
+        return self._nodes[n]
+
+    def attribute_nodes_set(self, n, value):
+        self._nodes[n] = value
+
+    def attribute_nodes_append(self, value):
+        self._nodes.append(value)
+
     # const fan-ins
     @staticmethod
     def get_literal_const0():
@@ -1453,12 +1508,14 @@ class PMIG:
         '''
         return len(self._latches)
 
+
     def n_buffers(self):
         '''
         Return len(self._buffers)
         :return:
         '''
         return len(self._buffers)
+
 
     def n_nonterminals(self):
         '''
@@ -1480,6 +1537,14 @@ class PMIG:
         '''
 
         return self.n_nonterminals() - self.n_buffers()
+
+    def n_nodes(self):
+        '''
+        Return len(self._nodes).
+
+        :return: INT
+        '''
+        return len(self._nodes)
 
     def n_pos(self):
         '''
@@ -1511,7 +1576,7 @@ class PMIG:
 
     def n_polymorphic_nodes(self):
         '''
-        Return len(self._polymorphic_edges)
+        Return len(self._polymorphic_nodes)
 
         :return: INT
         '''
@@ -1720,7 +1785,8 @@ class PMIG:
         :param f: INT - Literal
         :return: _MIG_Node - Node
         '''
-        return self._nodes[ f >> 2 ]
+        # return self._nodes[ f >> 2 ]
+        return self.attribute_nodes_get( f >> 2 )
 
     def name(self):
         '''
@@ -1974,7 +2040,7 @@ class PMIG:
 
     # PO names
     def set_po_name(self, po, name):
-        assert 0 <= po < len(self._pos)
+        assert 0 <= po < self.n_pos()
         assert name not in self._name_to_po
         assert po not in self._po_to_name
 
@@ -2028,12 +2094,16 @@ class PMIG:
         :param name: STRING - Name
         :return: INT - Literal of the node
         '''
-        pi_id = len(self._pis)
+        # pi_id = len(self._pis)
+        pi_id = self.n_pis()
         n = _MIG_Node.make_pi(pi_id)
-        fn = len(self._nodes) << 2
+        # fn = len(self._nodes) << 2
+        fn = self.n_nodes() << 2
 
-        self._nodes.append(n)
-        self._pis.append(fn)
+        # self._nodes.append(n)
+        self.attribute_nodes_append(n)
+        # self._pis.append(fn)
+        self.attribute_pis_append(fn)
 
         if name is not None:
             self.set_name(fn, name)
@@ -2049,12 +2119,16 @@ class PMIG:
         :param next: INT - Next state
         :return: INT - Literal of the node
         '''
-        l_id = len(self._latches)
+        # l_id = len(self._latches)
+        l_id = self.n_latches()
         n = _MIG_Node.make_latch(l_id, init, next)
-        fn = len(self._nodes) << 2
+        # fn = len(self._nodes) << 2
+        fn = self.n_nodes() << 2
 
-        self._nodes.append(n)
-        self._latches.append(fn)
+        # self._nodes.append(n)
+        self.attribute_nodes_append(n)
+        # self._latches.append(fn)
+        self.attribute_latches_append(fn)
 
         if name is not None:
             self.set_name(fn, name)
@@ -2103,13 +2177,18 @@ class PMIG:
 
         # Structural hashing
         key = (_MIG_Node.MAJ, child0, child1, child2)
-        if key in self._strash:
-            return self._strash[key]
+        # if key in self._strash:
+            # return self._strash[key]
+        if self.attribute_strash_if_exist(key):
+            return self.attribute_strash_get(key)
 
-        fn = len(self._nodes) << 2
+        # fn = len(self._nodes) << 2
+        fn = self.n_nodes() << 2
         n = _MIG_Node.make_maj(child0, child1, child2)
-        self._nodes.append(n)
-        self._strash[key] = fn
+        # self._nodes.append(n)
+        self.attribute_nodes_append(n)
+        # self._strash[key] = fn
+        self.attribute_strash_add(key, fn)
 
         # Polymorphic
         if self.is_polymorphic_literal(child0) or self.is_polymorphic_literal(child1) or self.is_polymorphic_literal(child2):
@@ -2139,20 +2218,26 @@ class PMIG:
             child0, child1 = child1, child0
 
         # Additional structural hashing checks
-        child0_ne, child1_ne, child2_ne = self.negate_maj_fanins_literal_if(child0, child1, child2, c)
+        child0_ne, child1_ne, child2_ne = self.negate_maj_fanins_literal_if(child0, child1, child2, True)
         key_negated = (_MIG_Node.MAJ, child0_ne, child1_ne, child2_ne)
-        if key_negated in self._strash:
-            return self.negate_literal_if( self._strash[key_negated], True)
+        # if key_negated in self._strash:
+            # return self.negate_literal_if( self._strash[key_negated], True)
+        if self.attribute_strash_if_exist(key_negated):
+            return self.negate_literal_if(self.attribute_strash_get(key_negated), True)
 
-        child0_po, child1_po, child2_po = self.polymorphic_maj_fanins_literal_if(child0, child1, child2, c)
+        child0_po, child1_po, child2_po = self.polymorphic_maj_fanins_literal_if(child0, child1, child2, True)
         key_polyed = (_MIG_Node.MAJ, child0_po, child1_po, child2_po)
-        if key_polyed in self._strash:
-            return self.polymorphic_literal_if( self._strash[key_polyed], True )
+        # if key_polyed in self._strash:
+            # return self.polymorphic_literal_if( self._strash[key_polyed], True )
+        if self.attribute_strash_if_exist(key_polyed):
+            return self.polymorphic_literal_if(self.attribute_strash_get(key_polyed), True)
 
         child0_ne_po, child1_ne_po, child2_ne_po = self.negate_and_polymorphic_maj_fanins_literal_if(child0, child1, child2, True)
         key_negated_polyed = (_MIG_Node.MAJ, child0_ne_po, child1_ne_po, child2_ne_po)
-        if key_negated_polyed in self._strash:
-            return self.polymorphic_literal_if( self.negate_literal_if(self._strash[key_negated_polyed, True]), True )
+        # if key_negated_polyed in self._strash:
+            # return self.polymorphic_literal_if( self.negate_literal_if(self._strash[key_negated_polyed, True]), True )
+        if self.attribute_strash_if_exist(key_negated_polyed):
+            return self.polymorphic_literal_if( self.negate_literal_if(self.attribute_strash_get(key_negated_polyed), True), True )
 
         return self.create_maj(child0, child1, child2)
 
@@ -2167,12 +2252,16 @@ class PMIG:
         :param name: STRING - Name
         :return: INT - Literal of the buffer
         '''
-        buf_id = len(self._buffers)
-        fn = len(self._nodes) << 2
+        # buf_id = len(self._buffers)
+        buf_id = self.n_buffers()
+        # fn = len(self._nodes) << 2
+        fn = self.n_nodes() << 2
         n = _MIG_Node.make_buffer(buf_id, buf_in)
 
-        self._nodes.append(n)
-        self._buffers.append(fn)
+        # self._nodes.append(n)
+        self.attribute_nodes_append(n)
+        # self._buffers.append(fn)
+        self.attribute_buffers_append(fn)
 
         if name is not None:
             self.set_name(fn, name)
@@ -2195,9 +2284,12 @@ class PMIG:
         assert self.get_buffer_in(buf_id) >= 0
 
         n = self.deref(buf_id)
-        self._buffers[n.get_buf_id()] = -1
-        n.convert_buf_to_pi(len(self._pis))
-        self._pis.append(buf_id)
+        # self._buffers[n.get_buf_id()] = -1
+        self.attribute_buffers_set(n.get_buf_id(), -1)
+        # n.convert_buf_to_pi(len(self._pis))
+        n.convert_buf_to_pi(self.n_pis())
+        # self._pis.append(buf_id)
+        self.attribute_pis_append(buf_id)
 
         # Polymorphic
         if self.is_polymorphic_literal(buf_id):
@@ -2213,8 +2305,9 @@ class PMIG:
         :param po_type:
         :return:
         '''
-        po_id = len(self._pos)
-        self._pos.append( (f, po_type) )
+        po_id = self.n_pos()
+        # self._pos.append( (f, po_type) )
+        self.attribute_pos_append( (f, po_type) )
 
         if name is not None:
             self.set_po_name(po_id, name)
@@ -2305,7 +2398,8 @@ class PMIG:
         :param pi_id: INT - ID (Literal >> 2)
         :return: INT - Literal
         '''
-        return self._pis[pi_id]
+        # return self._pis[pi_id]
+        return self.attribute_pis_get(pi_id)
 
     # Latches
     def get_latch_init(self, l):
@@ -2510,17 +2604,20 @@ class PMIG:
 
     # PO fanins
     def get_po_fanin(self, po):
-        assert 0 <= po < len(self._pos)
-        return self._pos[po][0]
+        assert 0 <= po < self.n_pos()
+        # return self._pos[po][0]
+        return self.attribute_pos_get(po)[0]
 
     def get_po_type(self, po):
-        assert 0 <= po < len(self._pos)
-        return self._pos[po][1]
+        assert 0 <= po < self.n_pos()
+        # return self._pos[po][1]
+        return self.attribute_pos_get(po)[1]
 
     def set_po_fanin(self, po, fanin):
-        assert 0 <= po < len(self._pos)
+        assert 0 <= po < self.n_pos()
         fanin_old = self.get_po_fanin(po)
-        self._pos[po] = (fanin, self._pos[po][1])
+        # self._pos[po] = (fanin, self._pos[po][1])
+        self.attribute_pos_set(po, (fanin, self.get_po_type(po)))
 
         # Polymorphic
         if self.is_polymorphic_literal(fanin_old):
@@ -2532,9 +2629,10 @@ class PMIG:
                 self.polymorphic_edgesdict_add(fanin, _MIG_Node.PO, self.get_po_type(fanin))
 
     def set_po_type(self, po, po_type):
-        assert 0 <= po < len(self._pos)
+        assert 0 <= po < self.n_pos()
         type_old = self.get_po_type(po)
-        self._pos[po] = (self._pos[po][0], po_type)
+        # self._pos[po] = (self._pos[po][0], po_type)
+        self.attribute_pos_set(po, (self.get_po_fanin(po), po_type))
 
         # Polymorphic
         self.polymorphic_edgesdict_modify(self.get_po_fanin(po), _MIG_Node.PO, po_type )
@@ -2670,7 +2768,8 @@ class PMIG:
 
                 # Checks
                 if ADDITIONAL_CHECKS:
-                    assert pmig_obj._pis[-1] == pi_literal
+                    # assert pmig_obj._pis[-1] == pi_literal
+                    assert pmig_obj.attribute_pis_get(-1) == pi_literal
                     assert return_literal == pi_literal
                     assert pmig_obj.n_pis() == pi_id + 1
                     assert aig_obj._pis[pi_id] == return_literal >> 1
@@ -2702,7 +2801,8 @@ class PMIG:
 
                 # Checks
                 if ADDITIONAL_CHECKS:
-                    assert pmig_obj._latches[-1] == latch_literal
+                    # assert pmig_obj._latches[-1] == latch_literal
+                    assert pmig_obj.attribute_latches_get(-1) == latch_literal
                     assert return_literal == latch_literal
                     assert pmig_obj.n_latches() == latch_id + 1
                     assert aig_obj._latches[latch_id] == return_literal >> 1
@@ -2731,7 +2831,8 @@ class PMIG:
                 # Checks
                 if ADDITIONAL_CHECKS:
                     assert return_literal == node_i << 2
-                    assert pmig_obj._nodes[node_i].is_maj()
+                    # assert pmig_obj._nodes[node_i].is_maj()
+                    assert pmig_obj.attribute_nodes_get(node_i).is_maj()
                     assert fanin_literal_aig_to_pmig(and_left) == pmig_obj.get_maj_child2(return_literal)
                     assert fanin_literal_aig_to_pmig(and_right) == pmig_obj.get_maj_child1(return_literal)
                     assert pmig_obj.get_maj_child0(return_literal) == 0
@@ -2757,7 +2858,8 @@ class PMIG:
 
                 # Checks
                 if ADDITIONAL_CHECKS:
-                    assert pmig_obj._buffers[-1] == buffer_literal
+                    # assert pmig_obj._buffers[-1] == buffer_literal
+                    assert pmig_obj.attribute_buffers_get(-1) == buffer_literal
                     assert return_literal == buffer_literal
                     assert pmig_obj.n_buffers() == buffer_id + 1
                     assert fanin_literal_aig_to_pmig(node_n.get_fanins()[0]) == buffer_in_new
@@ -2793,9 +2895,11 @@ class PMIG:
             # Checks
             if ADDITIONAL_CHECKS:
                 assert return_id == po_id
-                assert pmig_obj._pos[-1] == (po_fanin_new, po_type_new)
+                # assert pmig_obj._pos[-1] == (po_fanin_new, po_type_new)
+                assert pmig_obj.attribute_pos_get(-1) == (po_fanin_new, po_type_new)
                 assert pmig_obj.n_pos() == po_id + 1
-                assert pmig_obj._pos[po_id][0] == fanin_literal_aig_to_pmig(po_fanin)
+                # assert pmig_obj._pos[po_id][0] == fanin_literal_aig_to_pmig(po_fanin)
+                assert pmig_obj.get_po_fanin(po_id) == fanin_literal_aig_to_pmig(po_fanin)
 
 
         if echo_mode > 1: print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Conversion from [ AIG:",  aig_obj._name,\
