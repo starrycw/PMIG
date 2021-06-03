@@ -1439,7 +1439,7 @@ class PMIG:
         return self._buffers[n]
 
     def attribute_buffers_append(self, value):
-        self._buffers.append(value)
+        return self._buffers.append(value)
 
     def attribute_buffers_set(self, n, value):
         self._buffers[n] = value
@@ -1452,7 +1452,7 @@ class PMIG:
         self._nodes[n] = value
 
     def attribute_nodes_append(self, value):
-        self._nodes.append(value)
+        return self._nodes.append(value)
 
     # const fan-ins
     @staticmethod
@@ -1671,7 +1671,7 @@ class PMIG:
 
         value (Others) = 1
 
-        :param p_id: INT - Literal (positive and non-polymorphic for types except PO)
+        :param p_id: INT - Literal (positive and non-polymorphic for types except PO / fan-in literal for PO)
         :param p_type: INT - _MIG_Node.MAJ/LATCH/BUFFER/PO. Cannot be PI.
         :param p_value: INT
         :return:
@@ -1696,7 +1696,7 @@ class PMIG:
 
         value (Others) = 1
 
-        :param p_id: INT - Literal (positive and non-polymorphic for types except PO)
+        :param p_id: INT - Literal (positive and non-polymorphic for types except PO / fan-in literal for PO)
         :param p_type: INT - _MIG_Node.MAJ/LATCH/BUFFER/PO. Cannot be PI.
         :param p_value: INT
         :return:
@@ -1713,7 +1713,7 @@ class PMIG:
         '''
         Delete {id: [type, value]} in dict: _polymorphic_edges
 
-        :param p_id: INT - Literal (positive and non-polymorphic for types except PO)
+        :param p_id: INT - Literal (positive and non-polymorphic for types except PO / fan-in literal for PO)
         :return:
         '''
         assert p_id in self._polymorphic_edges
@@ -2622,11 +2622,11 @@ class PMIG:
         # Polymorphic
         if self.is_polymorphic_literal(fanin_old):
             if self.is_polymorphic_literal(fanin):
-                self.polymorphic_edgesdict_add(fanin, _MIG_Node.PO, self.get_po_type(fanin))
+                self.polymorphic_edgesdict_add(fanin, _MIG_Node.PO, self.get_po_type(po))
             self.polymorphic_edgesdict_delete(fanin_old)
         else:
             if self.is_polymorphic_literal(fanin):
-                self.polymorphic_edgesdict_add(fanin, _MIG_Node.PO, self.get_po_type(fanin))
+                self.polymorphic_edgesdict_add(fanin, _MIG_Node.PO, self.get_po_type(po))
 
     def set_po_type(self, po, po_type):
         assert 0 <= po < self.n_pos()
