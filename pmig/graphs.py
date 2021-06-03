@@ -1408,6 +1408,10 @@ class PMIG:
 
     def attribute_strash_add(self, key, value):
         assert not self.attribute_strash_if_exist(key)
+        assert not ( self.is_negated_literal(value) or self.is_polymorphic_literal(value) )
+        assert isinstance(value, int)
+        assert isinstance(key, tuple)
+        assert len(key) == 4
         self._strash[key] = value
 
     # self._pis
@@ -1415,6 +1419,8 @@ class PMIG:
         return self._pis[n]
 
     def attribute_pis_append(self, value):
+        assert not (self.is_negated_literal(value) or self.is_polymorphic_literal(value))
+        assert isinstance(value, int)
         return self._pis.append(value)
 
     # self._pos
@@ -1422,9 +1428,19 @@ class PMIG:
         return self._pos[n]
 
     def attribute_pos_append(self, value):
+        assert isinstance(value, tuple)
+        assert isinstance(value[0], int)
+        assert isinstance(value[1], int)
+        assert len(value) == 2
         return self._pos.append(value)
 
     def attribute_pos_set(self, n, value):
+        assert 0 <= n < self.n_pos()
+        assert isinstance(n, int)
+        assert isinstance(value, tuple)
+        assert isinstance(value[0], int)
+        assert isinstance(value[1], int)
+        assert len(value) == 2
         self._pos[n] = value
 
     # self._latches
@@ -1432,6 +1448,8 @@ class PMIG:
         return self._latches[n]
 
     def attribute_latches_append(self, value):
+        assert not ( self.is_negated_literal(value) or self.is_polymorphic_literal(value) )
+        assert isinstance(value, int)
         self._latches.append(value)
 
     # self._buffers
@@ -1439,9 +1457,15 @@ class PMIG:
         return self._buffers[n]
 
     def attribute_buffers_append(self, value):
+        assert not (self.is_negated_literal(value) or self.is_polymorphic_literal(value))
+        assert isinstance(value, int)
         return self._buffers.append(value)
 
     def attribute_buffers_set(self, n, value):
+        assert not (self.is_negated_literal(value) or self.is_polymorphic_literal(value))
+        assert isinstance(value, int)
+        assert 0 <= n < self.n_buffers()
+        assert isinstance(n, int)
         self._buffers[n] = value
 
     # self._nodes
@@ -1449,9 +1473,13 @@ class PMIG:
         return self._nodes[n]
 
     def attribute_nodes_set(self, n, value):
+        assert 0 <= n < self.n_nodes()
+        assert isinstance(n, int)
+        assert isinstance(value, _MIG_Node)
         self._nodes[n] = value
 
     def attribute_nodes_append(self, value):
+        assert isinstance(value, _MIG_Node)
         return self._nodes.append(value)
 
     # const fan-ins
