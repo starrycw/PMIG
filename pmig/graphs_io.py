@@ -4,7 +4,7 @@
 # @Author  : c
 # @File    : graphs_io.py
 #
-# 
+#
 #
 
 import io
@@ -16,7 +16,27 @@ xrange = range # alias!
 
 # from . aig import AIG
 from pmig import graphs
-AIG = graphs.AIG # alias!
+AIG = graphs.AIG # alias
+PMIG = graphs.PMIG #alias
+
+########################################################################################################################
+# PMIG_IO
+#
+# @Time    : 2021/6/4
+# @Author  : c
+#
+#
+#
+########################################################################################################################
+class _pmig_writer:
+    def __init__(self, pmig_obj):
+        assert isinstance(pmig_obj, PMIG)
+
+        self.N = pmig_obj.n_nodes()
+        self.I = pmig_obj.n_pis()
+        self.L = pmig_obj.n_latches()
+        self.O = pmig_obj.n_pos()
+        self.M = pmig_obj.is_maj()
 
 
 ########################################################################################################################

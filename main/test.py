@@ -38,6 +38,13 @@ aig_rca2.fill_po_names()
 
 mig_rca2 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_rca2, allow_modification=True, allow_buffer=True, allow_latch=True)
 
+# mig_rca2.attribute_polymorphic_nodes_flag_disable()
+# mig_rca2.attribute_polymorphic_edges_flag_disable()
+
+mig_rca2.create_maj(3, 5, 8)
+mig_rca2.create_maj(11, 5, 8)
+mig_rca2.create_maj(3, 7, 8)
+
 print("\n###AIG-PIs")
 for aig_pi in aig_rca2.get_pis():
     print(aig_pi)
@@ -85,5 +92,13 @@ print("\n###AIG: {} PIs, {} POs, {} NODEs, {} BUFs, {} LATs".format( len(aig_rca
 print("\n###MIG: {} PIs, {} POs, {} NODEs, {} BUFs, {} LATs".format( len(mig_rca2._pis), len(mig_rca2._pos), \
                                                                len(mig_rca2._nodes), len(mig_rca2._buffers), \
                                                                len(mig_rca2._latches) ))
+
+# mig_rca2.attribute_polymorphic_nodes_flag_disable()
+# mig_rca2.attribute_polymorphic_edges_flag_disable()
+print(mig_rca2.check_if_polymorphic_legal())
+print(list(mig_rca2.get_iter_nodes_with_polymorphic_pi()))
+print(mig_rca2.n_nodes_with_polymorphic_pi())
+print(list(mig_rca2.get_iter_nodes_with_polymorphic_edge()))
+print(mig_rca2.n_nodes_with_polymorphic_edge())
 
 
