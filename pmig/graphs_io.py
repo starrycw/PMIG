@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2021/5/26
 # @Author  : c
-# @File    : aig_io.py
+# @File    : graphs_io.py
 #
-# Based on the code on PyAIG (https://github.com/sterin/pyaig). Timestamp: 26 Jul 2020.
-# @Author: Baruch Sterin <sterin@berkeley.edu>
-# Simple Python AIG readers and writers
+# 
 #
 
 import io
@@ -21,6 +19,17 @@ from pmig import graphs
 AIG = graphs.AIG # alias!
 
 
+########################################################################################################################
+# AIG_IO
+#
+# @Time    : 2021/5/26
+# @Author  : c
+#
+# Based on PyAIG (https://github.com/sterin/pyaig). Timestamp: 26 Jul 2020.
+# @Author: Baruch Sterin <sterin@berkeley.edu>
+# Simple Python AIG readers and writers
+#
+########################################################################################################################
 class _aiger_writer(object):
 
     def __init__(self, I, L, O, A, B, C, J, F):

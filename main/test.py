@@ -10,7 +10,7 @@ import global_vars as g_vars
 g_vars._init()
 from pmig import convert_to_graph
 from pmig import graphs
-from pmig import aig_io
+from pmig import graphs_io
 
 # Get global variables from global_vars
 echo_mode = g_vars.get_value("echo_mode")
@@ -25,7 +25,7 @@ path_abc_srcfile = "rca2.v"
 status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", "rewrite", "abc", "python"), echo_mode)
 print(status, warnings)
 
-aig_rca2 = aig_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
+aig_rca2 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
 aig_rca2.create_latch(name="Latch01", next = 5)
 aig_rca2.create_latch(name="Latch06", init=graphs.AIG.INIT_ONE, next = 6)
 aig_rca2.create_po(f=7, name="PO001", po_type=graphs.AIG.JUSTICE)
