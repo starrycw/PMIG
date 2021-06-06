@@ -44,6 +44,11 @@ mig_rca2 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_rca2, allow_modification=
 mig_rca2.create_maj(3, 5, 8)
 mig_rca2.create_maj(11, 5, 8)
 mig_rca2.create_maj(3, 7, 8)
+mig_rca2.create_po(f=3)
+mig_rca2.create_po(f=10)
+
+for buf_l in mig_rca2.get_iter_buffers():
+    mig_rca2.convert_buf_to_pi(buf_l)
 
 print("\n###AIG-PIs")
 for aig_pi in aig_rca2.get_pis():
@@ -85,13 +90,9 @@ print("\n###MIG-POs")
 for mig_po in mig_rca2.get_iter_pos():
     print(mig_po)
 
-print("\n###AIG: {} PIs, {} POs, {} NODEs, {} BUFs, {} LATs".format( len(aig_rca2._pis), len(aig_rca2._pos), \
-                                                               len(aig_rca2._nodes), len(aig_rca2._buffers), \
-                                                               len(aig_rca2._latches) ))
+print("\n###AIG: {} PIs, {} POs, {} NODEs, {} BUFs, {} LATs".format( aig_rca2.n_pis(), aig_rca2.n_pos(), len(aig_rca2._nodes), aig_rca2.n_buffers(), aig_rca2.n_latches() ) )
 
-print("\n###MIG: {} PIs, {} POs, {} NODEs, {} BUFs, {} LATs".format( len(mig_rca2._pis), len(mig_rca2._pos), \
-                                                               len(mig_rca2._nodes), len(mig_rca2._buffers), \
-                                                               len(mig_rca2._latches) ))
+print("\n###MIG: {} PIs, {} POs, {} NODEs, {} BUFs, {} LATs, {} MAJs".format( mig_rca2.n_pis(), mig_rca2.n_pos(), len(mig_rca2._nodes), mig_rca2.n_buffers(), mig_rca2.n_latches(), mig_rca2.n_majs() ) )
 
 # mig_rca2.attribute_polymorphic_nodes_flag_disable()
 # mig_rca2.attribute_polymorphic_edges_flag_disable()
@@ -100,5 +101,76 @@ print(list(mig_rca2.get_iter_nodes_with_polymorphic_pi()))
 print(mig_rca2.n_nodes_with_polymorphic_pi())
 print(list(mig_rca2.get_iter_nodes_with_polymorphic_edge()))
 print(mig_rca2.n_nodes_with_polymorphic_edge())
+print(list(mig_rca2.get_iter_pos_with_polymorphic_fanin()))
+print(mig_rca2.n_pos_with_polymorphic_edge())
+
+filepath = path_abc_srcdir + '/' + 'test.pmig'
+print(filepath)
+writer01 = graphs_io.pmig_writer(mig_rca2)
+writer01.write_to_file('test.pmig', path_abc_srcdir)
+
+reader01 = graphs_io.pmig_reader()
+mig_01 = reader01.read_pmig(filepath)
+
+print("\n###MIG-PIs")
+for mig_pi in mig_01.get_iter_pis():
+    print(mig_pi)
+
+print("\n###MIG-PIs")
+for mig_pi in mig_rca2.get_iter_pis():
+    print(mig_pi)
+
+print("\n###MIG-MAJs")
+for mig_maj in mig_01.get_iter_majs():
+    print(mig_maj, mig_01.get_fanins(mig_maj))
+
+print("\n###MIG-MAJs")
+for mig_maj in mig_rca2.get_iter_majs():
+    print(mig_maj, mig_rca2.get_fanins(mig_maj))
+
+print("\n###MIG-BUFFERs")
+for mig_buf in mig_01.get_iter_buffers():
+    print(mig_buf)
+
+print("\n###MIG-BUFFERs")
+for mig_buf in mig_rca2.get_iter_buffers():
+    print(mig_buf)
+
+print("\n###MIG-LATCHs")
+for mig_lat in mig_01.get_iter_latches():
+    print(mig_lat)
+
+print("\n###MIG-LATCHs")
+for mig_lat in mig_rca2.get_iter_latches():
+    print(mig_lat)
+
+print("\n###MIG-POs")
+for mig_po in mig_01.get_iter_pos():
+    print(mig_po)
+
+print("\n###MIG-POs")
+for mig_po in mig_rca2.get_iter_pos():
+    print(mig_po)
+
+print("\n###MIG-NAMEs")
+for idname in mig_01._id_to_name.items():
+    print(idname)
+
+print("\n###MIG-NAMEs")
+for idname in mig_rca2._id_to_name.items():
+    print(idname)
+
+print("\n###MIG-PONAMEs")
+for idname in mig_01._po_to_name.items():
+    print(idname)
+
+print("\n###MIG-PONAMEs")
+for idname in mig_rca2._po_to_name.items():
+    print(idname)
+
+print("\n###MIG: {} PIs, {} POs, {} NODEs, {} BUFs, {} LATs, {} MAJs".format( mig_01.n_pis(), mig_01.n_pos(), len(mig_01._nodes), mig_01.n_buffers(), mig_01.n_latches(), mig_01.n_majs() ) )
+
+
+print("\n###MIG: {} PIs, {} POs, {} NODEs, {} BUFs, {} LATs, {} MAJs".format( mig_rca2.n_pis(), mig_rca2.n_pos(), len(mig_rca2._nodes), mig_rca2.n_buffers(), mig_rca2.n_latches(), mig_rca2.n_majs() ) )
 
 

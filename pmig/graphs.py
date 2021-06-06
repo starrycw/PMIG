@@ -1395,7 +1395,7 @@ class PMIG:
         self._polymorphic_flags = [True, True] # List of Bool: [enable_polymorphic_edges, enable_polymorphic_nodes]
 
     # self._polymorphic_flag
-    def attrbute_polymorphic_is_enabled(self):
+    def is_polymorphic_allowed(self):
         '''
         If at least one of "polymorphic-nodes" and "polymorphic-edges" are allowed.
 
@@ -1478,11 +1478,18 @@ class PMIG:
         return self._buffers.append(value)
 
     def attribute_buffers_set(self, n, value):
-        assert not (self.is_negated_literal(value) or self.is_polymorphic_literal(value))
-        assert isinstance(value, int)
-        assert 0 <= n < self.n_buffers()
-        assert isinstance(n, int)
-        self._buffers[n] = value
+        if value == -1:
+            self.attribute_buffers_del(n)
+        else:
+            assert not (self.is_negated_literal(value) or self.is_polymorphic_literal(value))
+            assert isinstance(value, int)
+            assert 0 <= n < self.n_buffers()
+            assert isinstance(n, int)
+            self._buffers[n] = value
+
+    def attribute_buffers_del(self, n):
+        self._buffers[n] = -1
+
 
     # self._nodes
     def attribute_nodes_get(self, n):
@@ -1553,12 +1560,19 @@ class PMIG:
         return len(self._latches)
 
 
-    def n_buffers(self):
+    def n_buffers_all(self):
         '''
         Return len(self._buffers)
         :return:
         '''
         return len(self._buffers)
+
+    def n_buffers(self):
+        '''
+        Return len( list( self.get_iter_buffers() ) )
+        :return:
+        '''
+        return len( list( self.get_iter_buffers() ) )
 
 
     def n_nonterminals(self):
@@ -1927,7 +1941,7 @@ class PMIG:
         '''
         # Polymorphic Checks
         if self.is_polymorphic_literal(l):
-            if not self.attrbute_polymorphic_is_enabled():
+            if not self.is_polymorphic_allowed():
                 return False
             if ( not self.attribute_polymorphic_edges_flag_get() ) and ( l not in (self.get_literal_const_1_0(), self.get_literal_const_0_1()) ):
                 return False
@@ -1940,7 +1954,7 @@ class PMIG:
         for l in self.get_iter_nodes_with_polymorphic_pi():
             n = self.deref(l)
             assert self.is_node_with_polymorphic_pi(n)
-            if not self.attrbute_polymorphic_is_enabled():
+            if not self.is_polymorphic_allowed():
                 return False
             if n.is_maj():
                 if (n.get_maj_child0() not in LITERAL_P_PI) and (n.get_maj_child1() not in LITERAL_P_PI) and (n.get_maj_child2() not in LITERAL_P_PI):
@@ -1965,7 +1979,7 @@ class PMIG:
         for l in self.get_iter_nodes_with_polymorphic_edge():
             n = self.deref(l)
             assert self.is_node_with_polymorphic_edge(n)
-            if not self.attrbute_polymorphic_is_enabled():
+            if not self.is_polymorphic_allowed():
                 return False
             if n.is_maj():
                 if not ( (self.is_polymorphic_literal(n.get_maj_child0())) or (self.is_polymorphic_literal(n.get_maj_child1())) or (self.is_polymorphic_literal(n.get_maj_child2())) ):
@@ -2161,6 +2175,12 @@ class PMIG:
 
 
     # Names
+    def is_id_to_name_empty(self):
+        return ( len(self._id_to_name) == 0 )
+
+    def is_po_to_name_empty(self):
+        return ( len(self._po_to_name) == 0 )
+
     def set_name(self, f, name):
         '''
         Set name of f. f should be a positive non-polyedged literal!
@@ -2360,7 +2380,7 @@ class PMIG:
 
         # # Polymorphic
         # if self.is_polymorphic_literal(next):
-        #     assert self.attrbute_polymorphic_is_enabled(), "Polymorphic attribute disabled!"
+        #     assert self.is_polymorphic_allowed(), "Polymorphic attribute disabled!"
         #     if ( next in (2, 3) ) and ( self.attribute_polymorphic_nodes_flag_get() ):
         #         self.polymorphic_nodesdict_add(fn, _MIG_Node.LATCH, 1)
         #     else:
@@ -2643,6 +2663,7 @@ class PMIG:
         '''
         n = self.deref(f)
         return n.is_maj
+
 
     # PIs
     def get_pi_by_id(self, pi_id):
