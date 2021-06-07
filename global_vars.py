@@ -36,7 +36,7 @@ def _init():
         print("[INFO] global_vars: Set path_main to", get_value('path_main') )
 
     # User-defined Variables
-    set_path('path_abc_srcdir', get_value('path_main') + '/examples') # The ABC program reads source files from 'path_abc_srcdir'
+    set_path('path_srcdir', get_value('path_main') + '/examples') # The ABC program reads source files from 'path_srcdir'
     set_path('path_aiger_dir', get_value('path_main') + '/tools/aiger') # The AIGER tools read source files from 'path_aiger_dir'
     ########################################################################################
     return 0
