@@ -2176,6 +2176,19 @@ class PMIG:
         child0_ne_po, child1_ne_po, child2_ne_po = PMIG.polymorphic_maj_fanins_literal_if(child0_ne, child1_ne, child2_ne, c)
         return (child0_ne_po, child1_ne_po, child2_ne_po)
 
+    @staticmethod
+    def add_attr_if_has_attr(f, c):
+        '''
+        Invert the negated/polymorphic flag of f if c is negated/polymorphic.
+
+        :param f: INT - Literal
+        :param c: INT - Literal
+        :return: INT - Literal
+        '''
+        f_ne = PMIG.negate_literal_if_negated(f, c)
+        f_ne_po = PMIG.polymorphic_literal_if_polyedged(f_ne, c)
+        return f_ne_po
+
 
     # Names
     def is_id_to_name_empty(self):
@@ -2623,7 +2636,7 @@ class PMIG:
         '''
         # assert isinstance(self, PMIG)
         n = self.deref(f)
-        return n.is_const0
+        return n.is_const0()
 
     def is_pi(self, f):
         '''
@@ -2634,7 +2647,7 @@ class PMIG:
         '''
         # assert isinstance(self, PMIG)
         n = self.deref(f)
-        return n.is_pi
+        return n.is_pi()
 
     def is_latch(self, f):
         '''
@@ -2645,7 +2658,7 @@ class PMIG:
         '''
         # assert isinstance(current_pmig, PMIG)
         n = self.deref(f)
-        return n.is_latch
+        return n.is_latch()
 
     def is_buffer(self, f):
         '''
@@ -2656,7 +2669,7 @@ class PMIG:
         '''
         # assert isinstance(current_pmig, PMIG)
         n = self.deref(f)
-        return n.is_buffer
+        return n.is_buffer()
 
     def is_maj(self, f):
         # assert isinstance(current_pmig, PMIG)
@@ -2667,7 +2680,7 @@ class PMIG:
         :return: Bool
         '''
         n = self.deref(f)
-        return n.is_maj
+        return n.is_maj()
 
 
     # PIs
@@ -3309,13 +3322,108 @@ class PMIG:
 
                 dfs_stack.append( (d, [fi for fi in fanins(d) if fi not in visited]) )
 
-    # def clean(self, pos = None, ):
-    #     '''
-    #     return a new PMIG, containing only the cone of the POs, removing buffers while attempting to preserve names.
-    #
-    #     :param pos:
-    #     :return:
-    #     '''
+    class node_map:
+        def __init__(self):
+            self._nodemap_original_to_new = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+            self._nodemap_new_to_original = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+            self._node_id = 1
+
+        def add_node_mapping(self, literal_original, literal_new):
+            l_original = PMIG.get_positive_normal_literal(literal_original)
+            l_new = PMIG.get_positive_normal_literal(literal_new)
+            assert l_new == self._node_id << 2
+            assert l_original not in self._nodemap_original_to_new
+            assert l_new not in self._nodemap_new_to_original
+            self._nodemap_original_to_new[l_original] = l_new
+            self._nodemap_new_to_original[l_new] = l_original
+            self._node_id = self._node_id + 1
+
+        def get_new_literal(self, literal_original):
+            l_original = PMIG.get_positive_normal_literal(literal_original)
+            assert l_original in self._nodemap_original_to_new
+            l_new = self._nodemap_original_to_new[l_original]
+            return PMIG.add_attr_if_has_attr(l_new, literal_original)
+
+    def pmig_clean_irrelevant_nodes(self, pos=None):
+        nmap = PMIG.node_map()
+        if pos == None:
+            # print(self.n_pos())
+            pos = range(0, self.n_pos())
+        pos_set = set(pos)
+        pmig_new = PMIG()
+        relevant_literals = self.get_seq_cone(self.get_po_fanin(po_id) for po_id in pos_set)
+
+        # Create nodes
+        for literal_i in self.topological_sort(relevant_literals):
+
+            assert isinstance(literal_i, int)
+            assert not self.is_negated_literal(literal_i)
+            assert not self.is_polymorphic_literal(literal_i)
+            # print(literal_i, self.deref(literal_i)._type)
+            if self.is_const0(literal_i):
+                assert literal_i == 0
+                continue
+
+            elif self.is_pi(literal_i):
+                if self.has_name(literal_i):
+                    new_l = pmig_new.create_pi(name=self.get_name_by_id(literal_i))
+                else:
+                    new_l = pmig_new.create_pi()
+                nmap.add_node_mapping(literal_i, new_l)
+
+            elif self.is_latch(literal_i):
+                latch_init = self.get_latch_init(literal_i)
+                latch_next = self.get_latch_next(literal_i)
+                new_latch_init = nmap.get_new_literal(latch_init)
+                new_latch_next = nmap.get_new_literal(latch_next)
+                if self.has_name(literal_i):
+                    new_l = pmig_new.create_latch(name=self.get_name_by_id(literal_i), init=new_latch_init, next=new_latch_next)
+                else:
+                    new_l = pmig_new.create_latch(init=new_latch_init, next=new_latch_next)
+                nmap.add_node_mapping(literal_i, new_l)
+
+            elif self.is_maj(literal_i):
+                maj_ch0 = self.get_maj_child0(literal_i)
+                maj_ch1 = self.get_maj_child1(literal_i)
+                maj_ch2 = self.get_maj_child2(literal_i)
+                new_maj_ch0 = nmap.get_new_literal(maj_ch0)
+                new_maj_ch1 = nmap.get_new_literal(maj_ch1)
+                new_maj_ch2 = nmap.get_new_literal(maj_ch2)
+                # print(new_maj_ch0, new_maj_ch1, new_maj_ch2)
+                new_l = pmig_new.create_maj(child0=new_maj_ch0, child1=new_maj_ch1, child2=new_maj_ch2)
+                if self.has_name(literal_i):
+                    pmig_new.set_name(new_l, self.get_name_by_id(literal_i))
+                nmap.add_node_mapping(literal_i, new_l)
+
+            elif self.is_buffer(literal_i):
+                buf_in = self.get_buffer_in(literal_i)
+                new_buf_in = nmap.get_new_literal(buf_in)
+                if self.has_name(literal_i):
+                    new_l = pmig_new.create_buffer(buf_in=new_buf_in, name=self.get_name_by_id(literal_i))
+                else:
+                    new_l = pmig_new.create_buffer(buf_in=new_buf_in)
+                nmap.add_node_mapping(literal_i, new_l)
+
+            else:
+                assert False
+
+        # Create POs
+        for po_i in pos_set:
+            po_fanin = self.get_po_fanin(po_i)
+            po_type = self.get_po_type(po_i)
+            new_po_fanin = nmap.get_new_literal(po_fanin)
+
+            if self.po_has_name(po_i):
+                pmig_new.create_po(f=new_po_fanin, name=self.get_name_by_po(po_i), po_type=po_type)
+            else:
+                pmig_new.create_po(f=new_po_fanin, po_type=po_type)
+        print(nmap._nodemap_original_to_new.items())
+        return pmig_new
+
+
+
+
+
 
 
 

@@ -27,11 +27,11 @@ status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_s
 print(status, warnings)
 
 aig_rca2 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
-aig_rca2.create_latch(name="Latch01", next = 5)
-aig_rca2.create_latch(name="Latch06", init=graphs.AIG.INIT_ONE, next = 600)
-aig_rca2.create_po(f=7, name="PO001", po_type=graphs.AIG.JUSTICE)
-aig_rca2.create_buffer(buf_in=3, name="BUF001")
-aig_rca2.create_buffer(buf_in=6)
+# aig_rca2.create_latch(name="Latch01", next = 5)
+# aig_rca2.create_latch(name="Latch06", init=graphs.AIG.INIT_ONE, next = 600)
+# aig_rca2.create_po(f=7, name="PO001", po_type=graphs.AIG.JUSTICE)
+# aig_rca2.create_buffer(buf_in=3, name="BUF001")
+# aig_rca2.create_buffer(buf_in=6)
 
 aig_rca2.fill_pi_names()
 aig_rca2.fill_po_names()
@@ -49,6 +49,11 @@ mig_rca2.create_maj(11, 5, 8)
 mig_rca2.create_maj(3, 7, 8)
 mig_rca2.create_po(f=3)
 mig_rca2.create_po(f=10)
+mig_rca2.create_maj(654, 32, 1)
+mig_rca2.create_maj(2310, 320, 10)
+mig_rca2.create_maj(2313, 325, 19)
+mig_rca2.create_po(f=2316)
+
 
 for buf_l in mig_rca2.get_iter_buffers():
     mig_rca2.convert_buf_to_pi(buf_l)
@@ -189,6 +194,17 @@ writer03.write_to_file('test02.pmig', path_abc_srcdir, f_comments_list=["Comment
 reader03 = graphs_io.pmig_reader()
 mig_03 = reader03.read_pmig(path_abc_srcdir + '/' + 'test02.pmig')
 
-cone1 = list(mig_03.topological_sort(roots=(2000, )))
-print(cone1)
+mig_new_01 = mig_03.pmig_clean_irrelevant_nodes()
+writer_new01 = graphs_io.pmig_writer(mig_new_01)
+writer_new01.write_to_file('test_new01.pmig', path_abc_srcdir, f_comments_list=["Comment example", "Line 2", "Line 3", "2021"])
+
+reader_new02 = graphs_io.pmig_reader()
+mig_new_02 = reader_new02.read_pmig(path_abc_srcdir + '/' + 'test_new01.pmig')
+writer_new02 = graphs_io.pmig_writer(mig_new_02)
+writer_new02.write_to_file('test_new02.pmig', path_abc_srcdir, f_comments_list=["Comment example", "Line 2", "Line 3", "2021"])
+
+cone1 = mig_03.get_seq_cone(roots=range(1000, 1500))
+cone2 = mig_03.topological_sort(cone1)
+print(list(cone1))
+print(list(cone2))
 
