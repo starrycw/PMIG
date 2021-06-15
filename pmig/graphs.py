@@ -1051,6 +1051,8 @@ class _MIG_Node:
         self._child1 = child1
         self._child2 = child2
 
+
+
     # creation
     @staticmethod
     def make_const0():
@@ -1366,7 +1368,8 @@ class PMIG:
 
     # PO types
     PO_OUTPUT = 0
-    PO_UNSUPPORTED = 1
+    PO_UNDEFINED = 1
+    PO_JUSTICE = 2
 
     def __init__(self, name = None):
         self._name = name # Name
@@ -2193,6 +2196,7 @@ class PMIG:
         assert not self.is_polymorphic_literal(f)
         assert name not in self._name_to_id
         assert f not in self._id_to_name
+        assert not (' ' in name), "[ERROR] Spaces are not allowed in node names! "
 
         self._name_to_id[name] = f
         self._id_to_name[f] = name
@@ -2284,6 +2288,7 @@ class PMIG:
         assert 0 <= po < self.n_pos()
         assert name not in self._name_to_po
         assert po not in self._po_to_name
+        assert not (' ' in name), "[ERROR] Spaces are not allowed in PO names! "
 
         self._name_to_po[name] = po
         self._po_to_name[po] = name
@@ -2982,8 +2987,10 @@ class PMIG:
 
     # Convert AIG to PMIG
     @staticmethod
-    def convert_aig_to_pmig(aig_obj, mig_name = None, allow_modification = False, allow_latch = False, allow_buffer = True, echo_mode = 3):
+    def convert_aig_to_pmig(aig_obj, mig_name = None, allow_modification = False, allow_latch = False, allow_buffer = True, custom_po_conversion = None, echo_mode = 3):
         '''
+        Convert a AIG obj to PMIG obj.
+
         - Param: allow_modification:
 
         -- False (Default) - Report an error if an unsupported feature is detected.
@@ -2992,7 +2999,7 @@ class PMIG:
 
         - The allowed modifications include:
 
-        -- Convert unsupported po types to PMIG.PO_UNSUPPORTED
+        -- Convert unsupported po types to PMIG.PO_UNDEFINED
 
         - Param: allow_latch:
 
@@ -3006,11 +3013,19 @@ class PMIG:
 
         -- False - Yes
 
+        - Param: custom_po_conversion:
+
+        -- DICT - Dict ALLOWED_AIG_PO_TYPE specify how the PO type is mapped from AIG to PMIG. It must contain {"undefined": PMIG.PO_UNDEFINED} in order to map undefined PO types.
+                  Example: {graphs.AIG.OUTPUT: graphs.PMIG.PO_OUTPUT, "undefined": graphs.PMIG.PO_UNDEFINED, graphs.AIG.JUSTICE: graphs.PMIG.PO_JUSTICE}
+
+        -- None(Default) - Dict ALLOWED_AIG_PO_TYPE is set to default
+
         :param aig_obj: AIG obj
         :param mig_name: STRING - MIG name
         :param allow_modification: Bool
         :param allow_latch: Bool
         :param allow_buffer: Bool
+        :param custom_po_conversion: None(Default) or DICT
         :param echo_mode: INT
         :return: PMIG obj
         '''
@@ -3018,8 +3033,12 @@ class PMIG:
         if echo_mode > 1: print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Start the conversion from [ AIG:",  aig_obj._name,\
                           "] to [ PMIG:", mig_name, "] ......")
         # Variables
-        ALLOWED_AIG_PO_TYPE = {AIG.OUTPUT: PMIG.PO_OUTPUT, "unsupported": PMIG.PO_UNSUPPORTED}
+        ALLOWED_AIG_PO_TYPE = {AIG.OUTPUT: PMIG.PO_OUTPUT, "undefined": PMIG.PO_UNDEFINED, AIG.JUSTICE: PMIG.PO_JUSTICE}
         ADDITIONAL_CHECKS = True
+        if custom_po_conversion:
+            assert isinstance(custom_po_conversion, dict)
+            assert "undefined" in custom_po_conversion
+            ALLOWED_AIG_PO_TYPE = custom_po_conversion
 
         # Literal convertion tools
         def fanin_literal_aig_to_pmig(aig_fanin_literal):
@@ -3160,7 +3179,7 @@ class PMIG:
             # PO type
             if po_type_aig not in ALLOWED_AIG_PO_TYPE:
                 if allow_modification:
-                    po_type_new = ALLOWED_AIG_PO_TYPE["unsupported"]
+                    po_type_new = ALLOWED_AIG_PO_TYPE["undefined"]
                 else:
                     assert False, "[ERROR] pmig/graph/PMIG.convert_aig_to_mig: Unsupport PO type!"
             else:
@@ -3192,6 +3211,113 @@ class PMIG:
         if echo_mode > 1: print("[INFO] pmig/graph/PMIG.convert_aig_to_mig: Conversion from [ AIG:",  aig_obj._name,\
                           "] to [ PMIG:", mig_name, "] is completed!")
         return pmig_obj
+
+    def get_cone(self, roots, stop = [], fanins = get_fanins_positive_normal):
+        '''
+        Return the cone of 'roots', stop at 'stop'
+
+        :param roots: ITREABLE OBJ.
+        :param stop: LIST
+        :param fanins: METHOD - get_fanins_positive_normal(Default, return fanins of MAJ and BUF)
+        :return: SET
+        '''
+        visited = set()
+        dfs_stack = list(roots)
+
+        while dfs_stack:
+
+            cur = self.get_positive_normal_literal(dfs_stack.pop())
+            if (cur in visited) or (cur in stop):
+                continue
+
+            visited.add(cur)
+
+            for fi in fanins(self, cur):
+                if fi not in visited:
+                    dfs_stack.append(fi)
+
+        return sorted(visited)
+
+    def get_seq_cone(self, roots, stop=[]):
+        '''
+        Return the seq cone of 'roots', stop at 'stop'
+
+        :param roots: ITREABLE OBJ.
+        :param stop: LIST
+        :return: SET
+        '''
+        return self.get_cone(roots=roots, stop=stop, fanins=PMIG.get_seq_fanins_positive_normal)
+
+    class fset:
+        def __init__(self, fs=[]):
+            self.s = set(PMIG.get_positive_normal_literal(f) for f in fs)
+
+        def __contains__(self, item):
+            return PMIG.get_positive_normal_literal(item) in self.s
+
+        def __len__(self):
+            return len(self.s)
+
+        def __iter__(self):
+            return self.s.__iter__()
+
+        def add(self, f):
+            f = PMIG.get_positive_normal_literal(f)
+            res = f in self.s
+            self.s.add(f)
+            return res
+
+        def remove(self, f):
+            return self.s.remove(PMIG.get_positive_normal_literal(f))
+
+    def topological_sort(self, roots, stop = ()):
+        '''
+        topologically sort the combinatorial cone of 'roots', stop at 'stop'
+
+        :param roots:
+        :param stop:
+        :return:
+        '''
+        def fanins(f):
+            if f in stop:
+                return []
+            return [fi for fi in self.get_fanins_positive_normal(f)]
+
+        visited = PMIG.fset()
+        dfs_stack = []
+
+        for root in roots:
+
+            if visited.add(root):
+                continue
+
+            dfs_stack.append( (root, fanins(root)) )
+
+            while dfs_stack:
+                cur, ds = dfs_stack[-1]
+                if not ds:
+                    dfs_stack.pop()
+                    if cur is not None:
+                        yield cur
+
+                    continue
+
+                d = ds.pop()
+
+                if visited.add(d):
+                    continue
+
+                dfs_stack.append( (d, [fi for fi in fanins(d) if fi not in visited]) )
+
+    # def clean(self, pos = None, ):
+    #     '''
+    #     return a new PMIG, containing only the cone of the POs, removing buffers while attempting to preserve names.
+    #
+    #     :param pos:
+    #     :return:
+    #     '''
+
+
 
 
 

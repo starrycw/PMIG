@@ -101,7 +101,7 @@ class pmig_writer:
             maj_ch2 = maj_n.get_maj_child2()
             if self._pmig_obj.has_name(maj_l):
                 maj_l_name = self._pmig_obj.get_name_by_id(maj_l)
-                f.write("{} {} {} {} {}\n".format(maj_l, maj_ch0, maj_ch1, maj_ch2, maj_l))
+                f.write("{} {} {} {} {}\n".format(maj_l, maj_ch0, maj_ch1, maj_ch2, maj_l_name))
             else:
                 f.write("{} {} {} {}\n".format(maj_l, maj_ch0, maj_ch1, maj_ch2))
             cnt = cnt + 1
@@ -210,7 +210,6 @@ class pmig_reader:
                 if len(line_list) == 1:
                     self._pmig_tasks[id] = ('pi', )
                 elif len(line_list) == 2:
-                    pi_name = line_list
                     self._pmig_tasks[id] = ('pi', )
                     self._pmig_task_names.append( (line_list[0], line_list[1]) )
                 else:
@@ -263,7 +262,7 @@ class pmig_reader:
                 line_list[1] = int(line_list[1])
                 line_list[2] = int(line_list[2])
                 line_list[3] = int(line_list[3])
-                assert int(line_list[0]) % 4 == 0
+                assert line_list[0] % 4 == 0
                 id = int(line_list[0]) >> 2
                 assert not id in self._pmig_tasks
                 if len(line_list) == 4:
