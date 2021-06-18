@@ -3285,7 +3285,7 @@ class PMIG:
 
     def topological_sort(self, roots, stop = ()):
         '''
-        topologically sort the combinatorial cone of 'roots', stop at 'stop'
+        Topologically sort the combinatorial cone of 'roots', stop at 'stop'
 
         :param roots:
         :param stop:
@@ -3345,6 +3345,12 @@ class PMIG:
             return PMIG.add_attr_if_has_attr(l_new, literal_original)
 
     def pmig_clean_irrelevant_nodes(self, pos=None):
+        '''
+        Return a new PMIG obj, only containing the nodes relevant to specified outputs (pos).
+
+        :param pos: None (Default) or LIST - Specified outputs.
+        :return:
+        '''
         nmap = PMIG.node_map()
         if pos == None:
             # print(self.n_pos())
@@ -3352,19 +3358,28 @@ class PMIG:
         pos_set = set(pos)
         pmig_new = PMIG()
         relevant_literals = self.get_seq_cone(self.get_po_fanin(po_id) for po_id in pos_set)
-
-        # Create nodes
+        # Create lists of PI and other nodes
+        pis_list = []
+        nodes_list = []
         for literal_i in self.topological_sort(relevant_literals):
-
             assert isinstance(literal_i, int)
             assert not self.is_negated_literal(literal_i)
             assert not self.is_polymorphic_literal(literal_i)
-            # print(literal_i, self.deref(literal_i)._type)
+
             if self.is_const0(literal_i):
                 assert literal_i == 0
                 continue
 
             elif self.is_pi(literal_i):
+                pis_list.append(literal_i)
+            else:
+                assert self.is_maj(literal_i) or self.is_latch(literal_i) or self.is_buffer(literal_i)
+                nodes_list.append(literal_i)
+
+        # Create nodes
+        for literal_i in (pis_list + nodes_list):
+
+            if self.is_pi(literal_i):
                 if self.has_name(literal_i):
                     new_l = pmig_new.create_pi(name=self.get_name_by_id(literal_i))
                 else:
@@ -3417,7 +3432,7 @@ class PMIG:
                 pmig_new.create_po(f=new_po_fanin, name=self.get_name_by_po(po_i), po_type=po_type)
             else:
                 pmig_new.create_po(f=new_po_fanin, po_type=po_type)
-        print(nmap._nodemap_original_to_new.items())
+        # print(nmap._nodemap_original_to_new.items())
         return pmig_new
 
 

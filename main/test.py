@@ -44,15 +44,14 @@ mig_rca2 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_rca2, allow_modification=
 # mig_rca2.attribute_polymorphic_nodes_flag_disable()
 # mig_rca2.attribute_polymorphic_edges_flag_disable()
 
-mig_rca2.create_maj(3, 5, 8)
-mig_rca2.create_maj(11, 5, 8)
-mig_rca2.create_maj(3, 7, 8)
+# mig_rca2.create_maj(3, 5, 8)
+# mig_rca2.create_maj(11, 5, 8)
 mig_rca2.create_po(f=3)
 mig_rca2.create_po(f=10)
-mig_rca2.create_maj(654, 32, 1)
-mig_rca2.create_maj(2310, 320, 10)
-mig_rca2.create_maj(2313, 325, 19)
-mig_rca2.create_po(f=2316)
+# mig_rca2.create_maj(654, 32, 1)
+# mig_rca2.create_maj(2310, 320, 10)
+# mig_rca2.create_maj(2313, 325, 19)
+# mig_rca2.create_po(f=2316)
 
 
 for buf_l in mig_rca2.get_iter_buffers():
@@ -208,3 +207,25 @@ cone2 = mig_03.topological_sort(cone1)
 print(list(cone1))
 print(list(cone2))
 
+reader_s01 = graphs_io.pmig_reader()
+mig_s01 = reader_s01.read_pmig(path_abc_srcdir + '/' + 's01.pmig')
+mig_s01_c0 = mig_s01.pmig_clean_irrelevant_nodes()
+mig_s01_c1 = mig_s01.pmig_clean_irrelevant_nodes((0, ))
+mig_s01_c2 = mig_s01.pmig_clean_irrelevant_nodes((0, 1))
+mig_s01_c3 = mig_s01.pmig_clean_irrelevant_nodes((2, ))
+mig_s01_c4 = mig_s01.pmig_clean_irrelevant_nodes((2, 1))
+
+writer_c0 = graphs_io.pmig_writer(mig_s01_c0)
+writer_c0.write_to_file('s01_c0.pmig', path_abc_srcdir)
+
+writer_c1 = graphs_io.pmig_writer(mig_s01_c1)
+writer_c1.write_to_file('s01_c1.pmig', path_abc_srcdir)
+
+writer_c2 = graphs_io.pmig_writer(mig_s01_c2)
+writer_c2.write_to_file('s01_c2.pmig', path_abc_srcdir)
+
+writer_c3 = graphs_io.pmig_writer(mig_s01_c3)
+writer_c3.write_to_file('s01_c3.pmig', path_abc_srcdir)
+
+writer_c4 = graphs_io.pmig_writer(mig_s01_c4)
+writer_c4.write_to_file('s01_c4.pmig', path_abc_srcdir)

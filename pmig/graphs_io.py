@@ -48,7 +48,7 @@ class pmig_writer:
         assert self._N == self._I + self._L + self._M + 1 # Const0
 
     def write_header(self, f):
-        f.write("pmig {} {} {} {} {}\n".format(self._N, self._I, self._L, self._O, self._M))
+        f.write("pmig {} {} {} {} {}\n".format(self._N, self._I, self._L, self._M, self._O))
 
     def write_pis(self, f):
         cnt = 0
@@ -144,8 +144,8 @@ class pmig_writer:
             self.write_header(f)
             self.write_pis(f)
             self.write_latches(f)
-            self.write_pos(f)
             self.write_majs(f)
+            self.write_pos(f)
             # self.write_names(f)
             self.write_comments(f)
 
@@ -193,10 +193,10 @@ class pmig_reader:
                 self._N = line_list[0]
                 self._I = line_list[1]
                 self._L = line_list[2]
-                self._O = line_list[3]
-                self._M = line_list[4]
+                self._M = line_list[3]
+                self._O = line_list[4]
                 assert self._N == self._I + self._L + self._M + 1
-                if self._echomode > 1: print("[INFO] graph_io/pmig_reader: Read header - ", self._N, self._I, self._L, self._O, self._M)
+                if self._echomode > 1: print("[INFO] graph_io/pmig_reader: Read header - ", self._N, self._I, self._L, self._M, self._O)
 
             elif 1 < cnt_line < 2 + self._I:
                 # self.read_pi(line, cnt_line)
@@ -235,25 +235,7 @@ class pmig_reader:
                 else:
                     assert False
 
-
-            elif 1 + self._I + self._L < cnt_line < 2 + self._I + self._L + self._O:
-                # self.read_po(line, cnt_line)
-                line_list = []
-                line_list = line.rstrip('\n').split(' ')
-                # assert len(line_list) == 2
-                line_list[0] = int(line_list[0])
-                line_list[1] = int(line_list[1])
-                # assert line_list[0] % 4 == 0
-                # id = line_list[0] >> 2
-                assert not line_list[0] in self._pmig_tasks_po
-                if len(line_list) == 2:
-                    self._pmig_tasks_po.append( (line_list[0], line_list[1]) )
-                elif len(line_list) == 3:
-                    self._pmig_tasks_po.append((line_list[0], line_list[1]))
-                    self._pmig_task_ponames.append( (current_po_id, line_list[2]) )
-                current_po_id = current_po_id + 1
-
-            elif 1 + self._I + self._L + self._O < cnt_line < 2 + self._I + self._L + self._O + self._M:
+            elif 1 + self._I + self._L < cnt_line < 2 + self._I + self._L + self._M:
                 # self.read_maj(line, cnt_line)
                 line_list = []
                 line_list = line.rstrip('\n').split(' ')
@@ -270,6 +252,24 @@ class pmig_reader:
                 elif len(line_list) == 5:
                     self._pmig_tasks[id] = ('maj', line_list[1], line_list[2], line_list[3])
                     self._pmig_task_names.append( (line_list[0], line_list[4]) )
+
+
+            elif 1 + self._I + self._L + self._M < cnt_line < 2 + self._I + self._L + self._M + self._O:
+                # self.read_po(line, cnt_line)
+                line_list = []
+                line_list = line.rstrip('\n').split(' ')
+                # assert len(line_list) == 2
+                line_list[0] = int(line_list[0])
+                line_list[1] = int(line_list[1])
+                # assert line_list[0] % 4 == 0
+                # id = line_list[0] >> 2
+                assert not line_list[0] in self._pmig_tasks_po
+                if len(line_list) == 2:
+                    self._pmig_tasks_po.append( (line_list[0], line_list[1]) )
+                elif len(line_list) == 3:
+                    self._pmig_tasks_po.append((line_list[0], line_list[1]))
+                    self._pmig_task_ponames.append( (current_po_id, line_list[2]) )
+                current_po_id = current_po_id + 1
 
             elif line[0] == '+':
                 if line[2] == 'n' and line[3] == 'n':
