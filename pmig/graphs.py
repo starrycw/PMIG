@@ -3000,7 +3000,7 @@ class PMIG:
 
     # Convert AIG to PMIG
     @staticmethod
-    def convert_aig_to_pmig(aig_obj, mig_name = None, allow_modification = False, allow_latch = False, allow_buffer = True, custom_po_conversion = None, echo_mode = 3):
+    def convert_aig_to_pmig(aig_obj, mig_name = None, allow_modification = False, allow_latch = True, allow_buffer = True, custom_po_conversion = None, echo_mode = 3):
         '''
         Convert a AIG obj to PMIG obj.
 
