@@ -1371,7 +1371,7 @@ class PMIG:
     PO_UNDEFINED = 1
     PO_JUSTICE = 2
 
-    def __init__(self, name = None):
+    def __init__(self, name = None, enable_polymorphic = [True, True]):
         self._name = name # Name
         self._strash = {} # Structural hashing table
         self._pis = [] # Literals of PIs (positive and non-polyedged)
@@ -1395,7 +1395,8 @@ class PMIG:
 
 
         self._nodes.append( _MIG_Node.make_const0() ) # The ID of CONST0 must be 0!
-        self._polymorphic_flags = [True, True] # List of Bool: [enable_polymorphic_edges, enable_polymorphic_nodes]
+        self._polymorphic_flags = enable_polymorphic # List of Bool: [enable_polymorphic_edges, enable_polymorphic_nodes]
+
 
     # self._polymorphic_flag
     def is_polymorphic_allowed(self):
@@ -2323,6 +2324,12 @@ class PMIG:
 
     def get_name_by_po(self, po):
         return self._po_to_name[po]
+
+    def get_name_by_po_if_has(self, po):
+        if self.po_has_name(po):
+            return self.get_name_by_po(po)
+        else:
+            return None
 
     def iter_po_names(self):
         return ((po_id, self.get_po_fanin(po_id), po_name) for po_id, po_name in self._po_to_name.items())
@@ -3434,6 +3441,8 @@ class PMIG:
                 pmig_new.create_po(f=new_po_fanin, po_type=po_type)
         # print(nmap._nodemap_original_to_new.items())
         return pmig_new
+
+
 
 
 

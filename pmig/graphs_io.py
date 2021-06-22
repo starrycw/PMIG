@@ -19,7 +19,7 @@ xrange = range # alias!
 # from . aig import AIG
 from pmig import graphs
 AIG = graphs.AIG # alias
-PMIG = graphs.PMIG #alias
+PMIG = graphs.PMIG # alias
 
 ########################################################################################################################
 # PMIG_IO

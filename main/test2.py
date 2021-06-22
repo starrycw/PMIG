@@ -11,6 +11,7 @@ g_vars._init()
 from pmig import convert_to_graph
 from pmig import graphs
 from pmig import graphs_io
+from pmig import graphs_polymorphic
 
 # Get global variables from global_vars
 echo_mode = g_vars.get_value("echo_mode")
@@ -41,3 +42,14 @@ reader_1 = graphs_io.pmig_reader()
 mig_1_1 = reader_1.read_pmig(path_abc_srcdir + '/' + 'mig_1.pmig')
 
 print(mig_1 == mig_1_1)
+
+mig_1_1.create_po(8)
+mig_1_1.create_po(4)
+
+pmux_mig1 = graphs_polymorphic.PMIG_PNode(mig_1, mig_1_1)
+pmux_mig1.print_pos_of_mig()
+mux_fanin_table1 = pmux_mig1.getattr_mux_fanin_list()
+pmux_mig1.set_mux_auto()
+mux_fanin_table2 = pmux_mig1.getattr_mux_fanin_list()
+print(mux_fanin_table1)
+print(mux_fanin_table2)

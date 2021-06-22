@@ -1,1 +1,1 @@
-__all__ = ['convert_to_graph.py', 'graphs.py', 'graphs_io.py']
+__all__ = ['convert_to_graph.py', 'graphs.py', 'graphs_io.py', 'graphs_polymorphic.py']
