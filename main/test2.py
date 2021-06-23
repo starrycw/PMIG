@@ -41,15 +41,27 @@ writer_1.write_to_file('mig_1.pmig', path_abc_srcdir, f_comments_list=["Comment 
 reader_1 = graphs_io.pmig_reader()
 mig_1_1 = reader_1.read_pmig(path_abc_srcdir + '/' + 'mig_1.pmig')
 
+reader_2 = graphs_io.pmig_reader()
+mig_2 = reader_2.read_pmig(path_abc_srcdir + '/' + 'mig_2.pmig')
+
 print(mig_1 == mig_1_1)
 
 mig_1_1.create_po(8)
 mig_1_1.create_po(4)
 
-pmux_mig1 = graphs_polymorphic.PMIG_PNode(mig_1, mig_1_1)
+for i in mig_2.get_iter_pos_with_polymorphic_fanin():
+    print('xxx', i)
+
+pmux_mig1 = graphs_polymorphic.PMIG_PNode(mig_1, mig_2)
 pmux_mig1.print_pos_of_mig()
-mux_fanin_table1 = pmux_mig1.getattr_mux_fanin_list()
+mux_fanin_table1 = pmux_mig1.mux_fanin_list_get()
 pmux_mig1.set_mux_auto()
-mux_fanin_table2 = pmux_mig1.getattr_mux_fanin_list()
+mux_fanin_table2 = pmux_mig1.mux_fanin_list_get()
+
 print(mux_fanin_table1)
 print(mux_fanin_table2)
+print(pmux_mig1.mux_fanin_list_get())
+print(pmux_mig1.mux_fanin_list_add(( (1, 2), (7, 6)) ))
+print(pmux_mig1.mux_fanin_list_get())
+print(pmux_mig1.mux_fanin_list_remove( ((1, 1), (8, 4), (2, 2)) ))
+print(pmux_mig1.mux_fanin_list_get())

@@ -12,16 +12,16 @@ PMIG = graphs.PMIG # alias
 from prettytable import PrettyTable
 
 
-class PMIG_PNode:
+class PMIG_Generation:
     def __init__(self, mig1, mig2):
         assert isinstance(mig1, PMIG)
         assert isinstance(mig2, PMIG)
-        assert not self.is_polymorphic_mig(mig1)
-        assert not self.is_polymorphic_mig(mig2)
+        assert not self.is_polymorphic_mig(mig1), "[ERROR]graphs_polymorphic: The input PMIG (mig1) cannot be polymorphic!"
+        assert not self.is_polymorphic_mig(mig2), "[ERROR]graphs_polymorphic: The input PMIG (mig2) cannot be polymorphic!"
         self._mig_a = mig1 # The PMIG obj of function A
         self._mig_b = mig2 # The PMIG obj of function B
         self._pmux, self._pmux_literals = self.get_pmux() # The PMIG obj of MUX, and the tuple of PI literals.
-        self._pmig_MuxAB = PMIG(enable_polymorphic=(False, True)) # The PMIG of AC+BC'.
+
         self._mux_fanins = [] # A list with tuple elements.
                              # Each tuple contains 2 literals, which are the literals of a PO literal of mig_a and the corresponding PO of mig_b.
                              # The two PO will be connected with a pmux.
@@ -44,19 +44,12 @@ class PMIG_PNode:
 
     def get_pmux(self):
         '''
-        Get a PMIG obj of a 2 to 1 MUX, with 3 PIs: "mig_a", "mig_b" and "ctl"(select signal), and a 1 output: "mux_PO".
+        It should be defined in sub-class!
 
-        :return: PMIG_obj, TUPLE - The PMIG of 2 to 1 MUX, and a tuple with 3 literal: (literal of "mig_a", literal of "mig_b", and literal of "mig_c").
+        :return:
         '''
-        pmux = PMIG(enable_polymorphic=[False, False])
-        literal_a = pmux.create_pi(name='mig_a')
-        literal_b = pmux.create_pi(name='mig_b')
-        literal_c = pmux.create_pi(name='ctl')
-        literal_ac = pmux.create_maj(literal_a, literal_c, pmux.get_literal_const0()) # M(a, c, 0)
-        literal_bc = pmux.create_maj(literal_b, pmux.negate_literal_if(literal_c, True), pmux.get_literal_const0()) # M(b, c', 0)
-        literal_abc = pmux.create_maj(literal_ac, literal_bc, pmux.get_literal_const1()) # M( M(a,c,0), M(b, c', 0), 1)
-        pmux.create_po(literal_abc, name="mux_PO")
-        return pmux, (literal_a, literal_b, literal_c)
+        # Assert False, "[ERROR] graphs_polymorphic: PMIG_Generation.get_pmux() should not be called! It should be defined in sub-class."
+        return PMIG(), None
 
     def print_pos_of_mig(self):
         '''
@@ -125,8 +118,66 @@ class PMIG_PNode:
                 print(info)
             return len(log_list)
 
-    def getattr_mux_fanin_list(self):
-        return self._mux_fanins
+    def mux_fanin_list_get(self):
+        '''
+        Return list(self._mux_fanins)
+
+        :return:
+        '''
+        return list(self._mux_fanins)
+
+    def mux_fanin_list_add(self, t):
+        '''
+        Add new items to self._mux_fanin list.
+
+        :param t: TUPLE or LIST - Containing tuples with 2 PO IDs.
+        :return: LIST - New self._mux_fanin list
+        '''
+        # assert isinstance(t, tuple)
+        for i in t:
+            assert isinstance(i, tuple)
+            assert len(i) == 2
+            assert not i in self._mux_fanins
+            self._mux_fanins.append(i)
+        return self.mux_fanin_list_get()
+
+    def mux_fanin_list_remove(self, t):
+        for i in t:
+            assert isinstance(i, tuple)
+            assert len(i) == 2
+            if i in self._mux_fanins:
+                self._mux_fanins.remove(i)
+        return self.mux_fanin_list_get()
+
+class PMIG_PNode(PMIG_Generation):
+    def __init__(self, mig1, mig2):
+        super().__init__(mig1, mig2)
+        self._pmig_generated = PMIG(enable_polymorphic=(False, True))
+
+    def get_pmux(self):
+        '''
+        Get a PMIG obj of a 2 to 1 MUX, with 3 PIs: "mig_a", "mig_b" and "ctl"(select signal), and a 1 output: "mux_PO".
+
+        :return: PMIG_obj, TUPLE - The PMIG of 2 to 1 MUX, and a tuple with 3 literal: (literal of "mig_a", literal of "mig_b", and literal of "mig_c").
+        '''
+        pmux = PMIG(enable_polymorphic=[False, False])
+        literal_a = pmux.create_pi(name='mig_a')
+        literal_b = pmux.create_pi(name='mig_b')
+        literal_c = pmux.create_pi(name='ctl')
+        literal_ac = pmux.create_maj(literal_a, literal_c, pmux.get_literal_const0()) # M(a, c, 0)
+        literal_bc = pmux.create_maj(literal_b, pmux.negate_literal_if(literal_c, True), pmux.get_literal_const0()) # M(b, c', 0)
+        literal_abc = pmux.create_maj(literal_ac, literal_bc, pmux.get_literal_const1()) # M( M(a,c,0), M(b, c', 0), 1)
+        pmux.create_po(literal_abc, name="mux_PO")
+        return pmux, (literal_a, literal_b, literal_c)
+
+class PMIG_PEdge(PMIG_Generation):
+    def __init__(self, mig1, mig2):
+        super().__init__(mig1, mig2)
+        self._pmig_generated = PMIG(enable_polymorphic=(True, False))
+
+
+
+
 
 
 
