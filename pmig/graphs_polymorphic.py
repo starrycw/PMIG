@@ -10,6 +10,133 @@ from pmig import graphs
 PMIG = graphs.PMIG # alias
 
 from prettytable import PrettyTable
+import copy
+
+
+class Literal_Map:
+    def __init__(self):
+        self._nodemap_A_to_new = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+        self._nodemap_new_to_A = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+        self._nodemap_B_to_new = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+        self._nodemap_new_to_B = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+        self._node_id_A = 1
+        self._node_id_B = 1
+        self._merge_pi_A_to_B = {}
+        self._merge_pi_B_to_A = {}
+
+    def reset_all(self):
+        self._nodemap_A_to_new = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+        self._nodemap_new_to_A = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+        self._nodemap_B_to_new = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+        self._nodemap_new_to_B = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+        self._node_id_A = 1
+        self._node_id_B = 1
+        self._merge_pi_A_to_B = {}
+        self._merge_pi_B_to_A = {}
+
+    def add_A_mapping(self, literal_A, literal_new):
+        l_A = PMIG.get_positive_normal_literal(literal_A)
+        l_new = PMIG.get_positive_normal_literal(literal_new)
+        # assert l_new == self._node_id_A << 2
+        assert l_A not in self._nodemap_A_to_new
+        assert l_new not in self._nodemap_new_to_A
+        self._nodemap_A_to_new[l_A] = l_new
+        self._nodemap_new_to_A[l_new] = l_A
+        self._node_id_A = self._node_id_A + 1
+
+    def add_B_mapping(self, literal_B, literal_new):
+        l_B = PMIG.get_positive_normal_literal(literal_B)
+        l_new = PMIG.get_positive_normal_literal(literal_new)
+        # assert l_new == (self._node_id_B + len(self._nodemap_A_to_new) - 1) << 2
+        assert l_B not in self._nodemap_B_to_new
+        assert l_new not in self._nodemap_new_to_B
+        self._nodemap_B_to_new[l_B] = l_new
+        self._nodemap_new_to_B[l_new] = l_B
+        self._node_id_B = self._node_id_B + 1
+
+    def add_new_mapping(self, literal_original, literal_new, subgraph):
+        if subgraph == 'A':
+            self.add_A_mapping(literal_original, literal_new)
+        elif subgraph == 'B':
+            self.add_B_mapping(literal_original, literal_new)
+        else:
+            assert False
+
+    def get_new_literal(self, literal_original, subgraph):
+        l_original = PMIG.get_positive_normal_literal(literal_original)
+        # assert subgraph in ('A', 'B')
+        if subgraph == 'A':
+            assert l_original in self._nodemap_A_to_new
+            l_new = self._nodemap_A_to_new[l_original]
+            return PMIG.add_attr_if_has_attr(l_new, literal_original)
+        elif subgraph == 'B':
+            assert l_original in self._nodemap_B_to_new
+            l_new = self._nodemap_B_to_new[l_original]
+            return PMIG.add_attr_if_has_attr(l_new, literal_original)
+        else:
+            assert False
+
+    def init_pi_merger_dict(self, merger_list):
+        '''
+        Load PI merge list
+
+        :param merger_list:
+        :return:
+        '''
+        for pi_a, pi_b in merger_list:
+            self._merge_pi_A_to_B[pi_a] = (pi_b, False)
+            self._merge_pi_B_to_A[pi_b] = (pi_a, False)
+
+    def get_pi_merge_info(self, pi_l, subgraph):
+        '''
+        Query if a PI of mig A or B is in the merge list.
+
+        :param pi_l: INT - Literal of a PI in A or B
+        :param subgraph: STRING - 'A' or 'B'
+        :return: Bool, Tuple - If the PI is in the merge list, then return True and (another PI, if defined). If not, return False and None.
+        '''
+        if subgraph == 'A':
+            if pi_l in self._merge_pi_A_to_B:
+                return True, self._merge_pi_A_to_B[pi_l]
+            else:
+                return False, None
+        elif subgraph == 'B':
+            if pi_l in self._merge_pi_B_to_A:
+                return True, self._merge_pi_B_to_A[pi_l]
+            else:
+                return False, None
+        else:
+            assert False
+
+    def enable_pi_merge(self, pi_l, new_l, subgraph):
+        '''
+        If a pair of PIs in the merge dict is defined in PMIG, then this function must be called to complete the merger process.
+
+        :param pi_l: INT - The literal of PI in mig A or B
+        :param new_l: INT - The new literal of PI
+        :param subgraph: String - 'A' or 'B'
+        :return:
+        '''
+        if subgraph == 'A':
+            assert pi_l in self._merge_pi_A_to_B
+            pi_ll, flag = self._merge_pi_A_to_B[pi_l]
+            assert not flag
+            self._merge_pi_A_to_B[pi_l] = (pi_ll, True)
+            self._merge_pi_B_to_A[pi_ll] = (pi_l, True)
+            self.add_A_mapping(literal_A=pi_l, literal_new=new_l)
+            self.add_B_mapping(literal_B=pi_ll, literal_new=new_l)
+        elif subgraph == 'B':
+            assert pi_l in self._merge_pi_B_to_A
+            pi_ll, flag = self._merge_pi_B_to_A[pi_l]
+            assert not flag
+            self._merge_pi_B_to_A[pi_l] = (pi_ll, True)
+            self._merge_pi_A_to_B[pi_ll] = (pi_l, True)
+            self.add_B_mapping(literal_B=pi_l, literal_new=new_l)
+            self.add_A_mapping(literal_A=pi_ll, literal_new=new_l)
+        else:
+            assert False
+
+
 
 
 class PMIG_Generation:
@@ -20,11 +147,16 @@ class PMIG_Generation:
         assert not self.is_polymorphic_mig(mig2), "[ERROR]graphs_polymorphic: The input PMIG (mig2) cannot be polymorphic!"
         self._mig_a = mig1 # The PMIG obj of function A
         self._mig_b = mig2 # The PMIG obj of function B
-        self._pmux, self._pmux_literals = self.get_pmux() # The PMIG obj of MUX, and the tuple of PI literals.
+        self._pmux, self._pmux_literals = self.get_pmux() # The PMIG obj of MUX, and the dict literals.
+                                                          # Example of self._pmux_literals:
+                                                          # {'fanin_A':literal_a, 'fanin_B':literal_b, 'ctl':literal_c, 'PI':None}
 
         self._mux_fanins = [] # A list with tuple elements.
                              # Each tuple contains 2 literals, which are the literals of a PO literal of mig_a and the corresponding PO of mig_b.
                              # The two PO will be connected with a pmux.
+        self._merged_pis = [] # A list with tuple elements.
+                             # Each tuple contains 2 literals, which are the literals of a PI to be merged.
+        self._conversion_map = Literal_Map()
 
     def is_polymorphic_mig(self, mig_obj):
         '''
@@ -42,14 +174,14 @@ class PMIG_Generation:
             return True
         return False
 
-    def get_pmux(self):
-        '''
-        It should be defined in sub-class!
-
-        :return:
-        '''
-        # Assert False, "[ERROR] graphs_polymorphic: PMIG_Generation.get_pmux() should not be called! It should be defined in sub-class."
-        return PMIG(), None
+    # def get_pmux(self):
+    #     '''
+    #     It should be defined in sub-class!
+    #
+    #     :return:
+    #     '''
+    #     # Assert False, "[ERROR] graphs_polymorphic: PMIG_Generation.get_pmux() should not be called! It should be defined in sub-class."
+    #     return PMIG(), None
 
     def print_pos_of_mig(self):
         '''
@@ -75,7 +207,46 @@ class PMIG_Generation:
         print(po_table)
         print("Type: PO_OUTPUT = 0, PO_UNDEFINED = 1, PO_JUSTICE = 2")
 
+    def print_pis_of_mig(self):
+        '''
+        Print the PIs of PMIG A and PMIG B.
+
+        :return:
+        '''
+        pi_table = PrettyTable(["NO.", "-", "A-Literal", "A-Name", " ", "B-Literal", "B-Name"])
+        n_pis_max = self._mig_a.n_pis()
+        if self._mig_b.n_pis() > self._mig_a.n_pis():
+            n_pis_max = self._mig_b.n_pis()
+        for pi_i in range(0, n_pis_max):
+            if pi_i < self._mig_a.n_pis():
+                pi_a_literal = self._mig_a.get_pi_by_id(pi_i)
+                if self._mig_a.has_name(pi_a_literal):
+                    pi_a_name = self._mig_a.get_name_by_id(pi_a_literal)
+                else:
+                    pi_a_name = None
+            else:
+                pi_a_literal, pi_a_name = 'N/A', 'N/A'
+
+            if pi_i < self._mig_b.n_pis():
+                pi_b_literal = self._mig_b.get_pi_by_id(pi_i)
+                if self._mig_b.has_name(pi_b_literal):
+                    pi_b_name = self._mig_b.get_name_by_id(pi_b_literal)
+                else:
+                    pi_b_name = None
+            else:
+                pi_b_literal, pi_b_name = 'N/A', 'N/A'
+            assert not ("N/A" in (pi_a_literal, pi_a_name) and "N/A" in (pi_b_literal, pi_b_name))
+            pi_table.add_row([pi_i, ' ', pi_a_literal, pi_a_name, ' ', pi_b_literal, pi_b_name])
+
+        print(pi_table)
+
     def set_mux_fanins(self, fanin_list = None):
+        '''
+        Set self._mux_fanins list. If fanin_list == None, then the first min(_mig_b.n_pis(), __mig_a.n_pis()) POs will be added to the list.
+
+        :param fanin_list:
+        :return:
+        '''
         if fanin_list == None:
             n_pos_min = self._mig_a.n_pos()
             if self._mig_b.n_pos() < self._mig_a.n_pos():
@@ -85,6 +256,23 @@ class PMIG_Generation:
                 fanin_list.append( (i, i) )
 
         self._mux_fanins = fanin_list
+
+    def set_merged_pis(self, pi_list = None):
+        '''
+        Set self._merged_pis list. If pi_list == None, then the first min(_mig_b.n_pis(), __mig_a.n_pis()) PIs will be added to the list.
+
+        :param pi_list:
+        :return:
+        '''
+        if pi_list == None:
+            n_pis_min = self._mig_a.n_pis()
+            if self._mig_b.n_pis() < self._mig_a.n_pis():
+                n_pis_min = self._mig_b.n_pis()
+            pi_list = []
+            for i in range(0, n_pis_min):
+                pi_list.append( (self._mig_a.get_pi_by_id(i), self._mig_b.get_pi_by_id(i)) )
+
+        self._merged_pis = pi_list
 
     def set_mux_auto(self, method = "name"):
         '''
@@ -110,9 +298,41 @@ class PMIG_Generation:
                 for b_i in pos_b:
                     if a_i[3] == b_i[3]:
                         self._mux_fanins.append( (a_i[0], b_i[0]) )
-                        pos_a.remove(a_i)
+                        #pos_a.remove(a_i)
                         pos_b.remove(b_i)
                         log_list.append( "Name:{}, ID in A:{}, ID in B:{}.".format(a_i[3], a_i[0], b_i[0]) )
+            print("Finished! {} connection created!".format(len(log_list)))
+            for info in log_list:
+                print(info)
+            return len(log_list)
+
+    def set_merged_pis_auto(self, method = "name"):
+        '''
+        Set _merged_pis list automatically.
+
+        :param method:
+        :return: INT - Number of created connections.
+        '''
+
+        if method == "name":
+            pis_named_a = []
+            pis_named_b = []
+            for pi_l in self._mig_a.get_iter_pis():
+                if self._mig_a.has_name(pi_l):
+                    pis_named_a.append( (pi_l, self._mig_a.get_name_by_id(pi_l)) )
+            for pi_l in self._mig_b.get_iter_pis():
+                if self._mig_b.has_name(pi_l):
+                    pis_named_b.append( (pi_l, self._mig_b.get_name_by_id(pi_l)) )
+
+            self._merged_pis = []
+            log_list = []
+            for a_i in pis_named_a:
+                for b_i in pis_named_b:
+                    if a_i[1] == b_i[1]:
+                        self._merged_pis.append( (a_i[0], b_i[0]) )
+                        #pis_named_a.remove(a_i)
+                        pis_named_b.remove(b_i)
+                        log_list.append( "Name:{}, Literal in A:{}, Literal in B:{}.".format(a_i[1], a_i[0], b_i[0]) )
             print("Finished! {} connection created!".format(len(log_list)))
             for info in log_list:
                 print(info)
@@ -125,6 +345,14 @@ class PMIG_Generation:
         :return:
         '''
         return list(self._mux_fanins)
+
+    def merged_pis_list_get(self):
+        '''
+        Return list(self._merged_pis)
+
+        :return:
+        '''
+        return list(self._merged_pis)
 
     def mux_fanin_list_add(self, t):
         '''
@@ -141,6 +369,21 @@ class PMIG_Generation:
             self._mux_fanins.append(i)
         return self.mux_fanin_list_get()
 
+    def merged_pis_list_add(self, t):
+        '''
+        Add new items to self._merged_pis list.
+
+        :param t: TUPLE or LIST - Containing tuples with 2 PI literals.
+        :return: LIST - New self._merged_pis list
+        '''
+        # assert isinstance(t, tuple)
+        for i in t:
+            assert isinstance(i, tuple)
+            assert len(i) == 2
+            assert not i in self._merged_pis
+            self._merged_pis.append(i)
+        return self.merged_pis_list_get()
+
     def mux_fanin_list_remove(self, t):
         for i in t:
             assert isinstance(i, tuple)
@@ -149,9 +392,199 @@ class PMIG_Generation:
                 self._mux_fanins.remove(i)
         return self.mux_fanin_list_get()
 
+    def merged_pis_list_remove(self, t):
+        for i in t:
+            assert isinstance(i, tuple)
+            assert len(i) == 2
+            if i in self._merged_pis:
+                self._merged_pis.remove(i)
+        return self.merged_pis_list_get()
+
+    def _convert_nodes_to_new(self, mig_obj, subgraph):
+        assert isinstance(mig_obj, PMIG)
+        assert isinstance(self._pmig_generated, PMIG)
+        assert subgraph in ('A', 'B')
+        # Nodes
+        for l in mig_obj.get_iter_nodes_all():
+            if mig_obj.has_name(l):
+                new_name = subgraph+'-'+mig_obj.get_name_by_id(l)
+                original_name = mig_obj.get_name_by_id(l)
+            else:
+                new_name = None
+                original_name = None
+
+            if mig_obj.is_const0(l):
+                assert l == mig_obj.get_literal_const0()
+
+            elif mig_obj.is_pi(l):
+                merge_if, merge_info = self._conversion_map.get_pi_merge_info(pi_l=l, subgraph=subgraph)
+                if merge_if:
+                    if merge_info[1]:
+                        pass
+                    else:
+                        if subgraph == 'A':
+                            new_name ="M-A{}B{}".format(l, merge_info[0])
+                        elif subgraph == 'B':
+                            new_name = "M-A{}B{}".format(merge_info[0], l)
+                        new_l = self._pmig_generated.create_pi(name=new_name)
+                        self._conversion_map.enable_pi_merge(pi_l=l, new_l=new_l, subgraph=subgraph)
+
+                else:
+                    new_l = self._pmig_generated.create_pi(name=new_name)
+                    self._conversion_map.add_new_mapping(l, new_l, subgraph)
+
+            elif mig_obj.is_maj(l):
+                ch0 = mig_obj.get_maj_child0(l)
+                ch1 = mig_obj.get_maj_child1(l)
+                ch2 = mig_obj.get_maj_child2(l)
+                new_ch0 = self._conversion_map.get_new_literal(ch0, subgraph)
+                new_ch1 = self._conversion_map.get_new_literal(ch1, subgraph)
+                new_ch2 = self._conversion_map.get_new_literal(ch2, subgraph)
+                new_l = self._pmig_generated.create_maj(child0=new_ch0,child1=new_ch1,child2=new_ch2)
+                self._conversion_map.add_new_mapping(l, new_l, subgraph)
+
+            elif mig_obj.is_latch(l):
+                l_init = mig_obj.get_latch_init(l)
+                l_next = mig_obj.get_latch_next(l)
+                new_init = self._conversion_map.get_new_literal(l_init, subgraph)
+                new_next = self._conversion_map.get_new_literal(l_next, subgraph)
+                new_l = self._pmig_generated.create_latch(name=new_name, init=new_init, next=new_next)
+                self._conversion_map.add_new_mapping(l, new_l, subgraph)
+
+            elif mig_obj.is_buffer(l):
+                buf_in = mig_obj.get_buffer_in(l)
+                new_in = self._conversion_map.get_new_literal(buf_in, subgraph)
+                new_l = self._pmig_generated.create_buffer(buf_in=new_in, name=new_name)
+                self._conversion_map.add_new_mapping(l, new_l, subgraph)
+
+            else:
+                assert False
+
+    def _convert_pos_to_new(self, mig_obj, subgraph):
+        assert isinstance(mig_obj, PMIG)
+        assert subgraph in ('A', 'B')
+        assert isinstance(self._pmig_generated, PMIG)
+        for po_id, po_fanin, po_type in mig_obj.get_iter_pos():
+            new_name = subgraph + '-' + mig_obj.get_name_by_po_if_has(po_id)
+            new_fanin = self._conversion_map.get_new_literal(po_fanin, subgraph)
+            new_type = po_type
+            self._pmig_generated.create_po(f=new_fanin, name=new_name, po_type=new_type)
+
+    def _create_mux(self, fanin_a, fanin_b):
+        assert isinstance(self._pmig_generated, PMIG)
+        assert isinstance(self._pmux, PMIG)
+        map_mux_to_new = {self._pmux.get_literal_const0(): self._pmig_generated.get_literal_const0()}
+        l_mux_a = self._pmux_literals['fanin_A']
+        l_mux_b = self._pmux_literals['fanin_B']
+        l_ctl = self._pmux_literals['ctl']
+        l_pis = self._pmux_literals['PI']
+        if l_pis != None:
+            for l_pi in l_pis:
+                new_l = self._pmig_generated.create_pi()
+                map_mux_to_new[l_pi] = new_l
+        map_mux_to_new[l_mux_a] = fanin_a
+        map_mux_to_new[l_mux_b] = fanin_b
+        map_mux_to_new[l_ctl] = self._pmig_generated.get_literal_const_0_1()
+        # Nodes
+        for l in self._pmux.get_iter_nodes_all():
+            if self._pmux.is_const0(l):
+                assert l == self._pmux.get_literal_const0()
+            elif self._pmux.is_pi(l):
+                if l_pis != None:
+                    assert (l in l_pis) or (l in (l_mux_a, l_mux_b, l_ctl))
+                else:
+                    assert l in (l_mux_a, l_mux_b, l_ctl)
+
+            elif self._pmux.is_maj(l):
+                ch0 = self._pmux.get_maj_child0(l)
+                ch1 = self._pmux.get_maj_child1(l)
+                ch2 = self._pmux.get_maj_child2(l)
+                ch0_normal = self._pmux.negate_literal_if_negated(self._pmux.polymorphic_literal_if_polyedged(ch0, ch0), ch0)
+                ch1_normal = self._pmux.negate_literal_if_negated(self._pmux.polymorphic_literal_if_polyedged(ch1, ch1), ch1)
+                ch2_normal = self._pmux.negate_literal_if_negated(self._pmux.polymorphic_literal_if_polyedged(ch2, ch2), ch2)
+                assert ch0_normal in map_mux_to_new
+                new_ch0 = self._pmux.polymorphic_literal_if_polyedged( self._pmux.negate_literal_if_negated(map_mux_to_new[ch0_normal], ch0), ch0 )
+                assert ch1_normal in map_mux_to_new
+                new_ch1 = self._pmux.polymorphic_literal_if_polyedged( self._pmux.negate_literal_if_negated(map_mux_to_new[ch1_normal], ch1), ch1 )
+                assert ch2_normal in map_mux_to_new
+                new_ch2 = self._pmux.polymorphic_literal_if_polyedged( self._pmux.negate_literal_if_negated(map_mux_to_new[ch2_normal], ch2), ch2 )
+                new_l = self._pmig_generated.create_maj(child0=new_ch0,child1=new_ch1,child2=new_ch2)
+                assert not l in map_mux_to_new
+                map_mux_to_new[l] = new_l
+
+            elif self._pmux.is_latch(l):
+                l_init = self._pmux.get_latch_init(l)
+                l_next = self._pmux.get_latch_next(l)
+                l_init_normal = self._pmux.negate_literal_if_negated(self._pmux.polymorphic_literal_if_polyedged(l_init, l_init), l_init)
+                l_next_normal = self._pmux.negate_literal_if_negated(self._pmux.polymorphic_literal_if_polyedged(l_next, l_next), l_next)
+                assert l_init_normal in map_mux_to_new
+                new_init = self._pmux.polymorphic_literal_if_polyedged( self._pmux.negate_literal_if_negated(map_mux_to_new[l_init_normal], l_init), l_init)
+                assert l_next_normal in map_mux_to_new
+                new_next = self._pmux.polymorphic_literal_if_polyedged( self._pmux.negate_literal_if_negated(map_mux_to_new[l_next_normal], l_next), l_next)
+                new_l = self._pmig_generated.create_latch(init=new_init, next=new_next)
+                assert not l in map_mux_to_new
+                map_mux_to_new[l] = new_l
+
+            elif self._pmux.is_buffer(l):
+                buf_in = self._pmux.get_buffer_in(l)
+                buf_in_normal = self._pmux.negate_literal_if_negated( self._pmux.polymorphic_literal_if_polyedged(buf_in, buf_in), buf_in)
+                assert buf_in_normal in map_mux_to_new
+                new_in = self._pmux.polymorphic_literal_if_polyedged( self._pmux.negate_literal_if_negated(map_mux_to_new[buf_in_normal], buf_in), buf_in)
+                new_l = self._pmig_generated.create_buffer(buf_in=new_in)
+                assert not l in map_mux_to_new
+                map_mux_to_new[l] = new_l
+
+            else:
+                assert False
+
+        # PO
+        po_cnt = 0
+        for po_id, po_fanin, po_type in self._pmux.get_iter_pos():
+            po_fanin_normal = self._pmux.negate_literal_if_negated( self._pmux.polymorphic_literal_if_polyedged(po_fanin, po_fanin), po_fanin)
+            assert po_fanin_normal in map_mux_to_new
+            new_fanin = self._pmux.polymorphic_literal_if_polyedged( self._pmux.negate_literal_if_negated(map_mux_to_new[po_fanin_normal], po_fanin), po_fanin)
+            new_name = 'Mux_out-{}_{}_{}'.format(fanin_a, fanin_b, po_cnt)
+            po_cnt = po_cnt + 1
+            self._pmig_generated.create_po(f=new_fanin, name=new_name, po_type=po_type)
+
+
+
+
+    def pmig_generation(self):
+        self._conversion_map.reset_all()
+        self.reset_pmig()
+        self._conversion_map.init_pi_merger_dict(merger_list=self._merged_pis)
+        # Nodes
+        self._convert_nodes_to_new(mig_obj=self._mig_a, subgraph='A')
+        self._convert_nodes_to_new(mig_obj=self._mig_b, subgraph='B')
+        # Original POs
+        self._convert_pos_to_new(mig_obj=self._mig_a, subgraph='A')
+        self._convert_pos_to_new(mig_obj=self._mig_b, subgraph='B')
+        # Mux
+        for po_id_a, po_id_b in self._mux_fanins:
+            po_in_a = self._mig_a.get_po_fanin(po_id_a)
+            po_in_b = self._mig_b.get_po_fanin(po_id_b)
+            new_po_in_a = self._conversion_map.get_new_literal(literal_original=po_in_a, subgraph='A')
+            new_po_in_b = self._conversion_map.get_new_literal(literal_original=po_in_b, subgraph='B')
+            self._create_mux(fanin_a=new_po_in_a, fanin_b=new_po_in_b)
+
+    def get_pmig_generated(self):
+        pmig_obj = copy.deepcopy(self._pmig_generated)
+        return pmig_obj
+
+
+
+
+
+
+
+
 class PMIG_PNode(PMIG_Generation):
     def __init__(self, mig1, mig2):
         super().__init__(mig1, mig2)
+        self._pmig_generated = PMIG(enable_polymorphic=(False, True))
+
+    def reset_pmig(self):
         self._pmig_generated = PMIG(enable_polymorphic=(False, True))
 
     def get_pmux(self):
@@ -168,11 +601,14 @@ class PMIG_PNode(PMIG_Generation):
         literal_bc = pmux.create_maj(literal_b, pmux.negate_literal_if(literal_c, True), pmux.get_literal_const0()) # M(b, c', 0)
         literal_abc = pmux.create_maj(literal_ac, literal_bc, pmux.get_literal_const1()) # M( M(a,c,0), M(b, c', 0), 1)
         pmux.create_po(literal_abc, name="mux_PO")
-        return pmux, (literal_a, literal_b, literal_c)
+        return pmux, {'fanin_A':literal_a, 'fanin_B':literal_b, 'ctl':literal_c, 'PI':None}
 
 class PMIG_PEdge(PMIG_Generation):
     def __init__(self, mig1, mig2):
         super().__init__(mig1, mig2)
+        self._pmig_generated = PMIG(enable_polymorphic=(True, False))
+
+    def reset_pmig(self):
         self._pmig_generated = PMIG(enable_polymorphic=(True, False))
 
 

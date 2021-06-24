@@ -1397,7 +1397,11 @@ class PMIG:
         self._nodes.append( _MIG_Node.make_const0() ) # The ID of CONST0 must be 0!
         self._polymorphic_flags = enable_polymorphic # List of Bool: [enable_polymorphic_edges, enable_polymorphic_nodes]
 
-
+    def __repr__(self):
+        return "#PMIG obj: \n Name: {} \n {} PIs, {} POs, {} MAJs, {} latches, {}/{} buffers \n Allow PEdge: {}, Allow PNode: {} \n PEdge number(N+P): {}+{}, PNode number(N+P): {}+{}".format\
+            ( self._name, self.n_pis(), self.n_pos(), self.n_majs(), self.n_latches(), self.n_buffers(), self.n_buffers_all(), \
+             self.attribute_polymorphic_edges_flag_get(), self.attribute_polymorphic_nodes_flag_get(), \
+              self.n_nodes_with_polymorphic_edge(), self.n_pos_with_polymorphic_edge(), self.n_nodes_with_polymorphic_pi(), self.n_pos_with_polymorphic_pi() )
     # self._polymorphic_flag
     def is_polymorphic_allowed(self):
         '''
@@ -1726,6 +1730,14 @@ class PMIG:
         '''
         return ( i << 2 for i, n in enumerate(self._nodes) if n.is_nonterminal() )
 
+    def get_iter_nodes_all(self):
+        '''
+        Return iterator of all nodes (Positive and non-polymorphic literal).
+
+        :return: ITERATOR: INT - Literal
+        '''
+        return ( i << 2 for i, n in enumerate(self._nodes))
+
 
     # # _polymorphic_edges
     # def polymorphic_edgesdict_add(self, p_id, p_type):
@@ -1935,6 +1947,14 @@ class PMIG:
         for (po_id, po_fanin, po_type) in self.get_iter_pos_with_polymorphic_fanin():
             cnt = cnt + 1
         return cnt
+
+    def n_pos_with_polymorphic_pi(self):
+        cnt = 0
+        for (po_id, po_fanin, po_type) in self.get_iter_pos_with_polymorphic_fanin():
+            if po_fanin in (self.get_literal_const_0_1(), self.get_literal_const_1_0()):
+                cnt = cnt + 1
+        return cnt
+
 
     def is_legal_polymorphic_fanin_literal(self, l):
         '''
