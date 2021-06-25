@@ -7,9 +7,8 @@
 Linux & Python 3.9
 
 #### 安装教程
-- 1\.  下载并解压。
-- 2\.  按照 https://github.com/macd/abcd 中的方法，编译ABC( https://github.com/Berkeley-abc/abc )，
-    并将得到的abcd.py和_abcd.so文件放置于./abcd目录。具体步骤如下 (以Manjaro Linux 21 为例)：
+- 1\.  下载本仓库并解压。
+- 2\.  下载ABC并解压 [1]。然后将其编译为Python可调用的库文件 [2]。将得到的abcd.py和_abcd.so文件放置于./abcd目录。具体步骤如下 (以Manjaro Linux 21 为例)：
   - (1) 安装make, gcc, swig。依次执行：
     ```
     sudo pacman -S make
@@ -17,7 +16,7 @@ Linux & Python 3.9
     sudo pacman -S swig
     ```
     
-  - (2) 下载 ABC( https://github.com/Berkeley-abc/abc ) 并解压至空文件夹， 并在解压后的目录执行：
+  - (2) 下载 ABC [1] 并解压至空文件夹， 并在解压后的目录执行：
     ```
     make ABC_USE_NO_READLINE=1 ABC_USE_PIC=1 libabc.so
     ```
@@ -26,7 +25,7 @@ Linux & Python 3.9
     ```
     swig -python abcd.i
     ```
-    abcd.i文件可从本仓库./abcd目录中获取，或者从 https://github.com/macd/abcd 下载。
+    abcd.i文件可从本仓库./abcd目录中获取，或者从 [2] 下载。
     
   - (4) 确定Python.h所在的位置，例如 ：
     ```
@@ -43,4 +42,10 @@ Linux & Python 3.9
 1.  xxxx
 2.  xxxx
 3.  xxxx
+
+#### Reference
+[1]. https://github.com/Berkeley-abc/abc
+[2]. https://github.com/macd/abcd
+
+
 

@@ -108,7 +108,7 @@ class Literal_Map:
         else:
             assert False
 
-    def enable_pi_merge(self, pi_l, new_l, subgraph):
+    def active_pi_merge(self, pi_l, new_l, subgraph):
         '''
         If a pair of PIs in the merge dict is defined in PMIG, then this function must be called to complete the merger process.
 
@@ -427,7 +427,7 @@ class PMIG_Generation:
                         elif subgraph == 'B':
                             new_name = "M-A{}B{}".format(merge_info[0], l)
                         new_l = self._pmig_generated.create_pi(name=new_name)
-                        self._conversion_map.enable_pi_merge(pi_l=l, new_l=new_l, subgraph=subgraph)
+                        self._conversion_map.active_pi_merge(pi_l=l, new_l=new_l, subgraph=subgraph)
 
                 else:
                     new_l = self._pmig_generated.create_pi(name=new_name)
@@ -470,7 +470,7 @@ class PMIG_Generation:
             new_type = po_type
             self._pmig_generated.create_po(f=new_fanin, name=new_name, po_type=new_type)
 
-    def _create_mux(self, fanin_a, fanin_b):
+    def _create_mux(self, fanin_a, fanin_b, obsolete_muxed_pos = False):
         assert isinstance(self._pmig_generated, PMIG)
         assert isinstance(self._pmux, PMIG)
         map_mux_to_new = {self._pmux.get_literal_const0(): self._pmig_generated.get_literal_const0()}
@@ -478,6 +478,7 @@ class PMIG_Generation:
         l_mux_b = self._pmux_literals['fanin_B']
         l_ctl = self._pmux_literals['ctl']
         l_pis = self._pmux_literals['PI']
+        # l_pis_shared = self._pmux_literals['shared_PI']
         if l_pis != None:
             for l_pi in l_pis:
                 new_l = self._pmig_generated.create_pi()
@@ -547,10 +548,21 @@ class PMIG_Generation:
             po_cnt = po_cnt + 1
             self._pmig_generated.create_po(f=new_fanin, name=new_name, po_type=po_type)
 
+        # Set original POs obsolete
+        if obsolete_muxed_pos:
+            for original_po_fanin in (fanin_a, fanin_b):
+                original_po = self._pmig_generated.get_iter_pos_by_fanin(original_po_fanin)
+                cnt_temp = 0
+                for po_id, po_fanin, po_type in original_po:
+                    print("#####################",po_id, po_fanin, po_type)
+                    self._pmig_generated.set_po_obsolete(po_id)
+                    cnt_temp = cnt_temp + 1
+                # assert cnt_temp <= 2
 
 
 
-    def pmig_generation(self):
+
+    def pmig_generation(self, obsolete_muxed_pos = False):
         self._conversion_map.reset_all()
         self.reset_pmig()
         self._conversion_map.init_pi_merger_dict(merger_list=self._merged_pis)
@@ -566,7 +578,7 @@ class PMIG_Generation:
             po_in_b = self._mig_b.get_po_fanin(po_id_b)
             new_po_in_a = self._conversion_map.get_new_literal(literal_original=po_in_a, subgraph='A')
             new_po_in_b = self._conversion_map.get_new_literal(literal_original=po_in_b, subgraph='B')
-            self._create_mux(fanin_a=new_po_in_a, fanin_b=new_po_in_b)
+            self._create_mux(fanin_a=new_po_in_a, fanin_b=new_po_in_b, obsolete_muxed_pos=obsolete_muxed_pos)
 
     def get_pmig_generated(self):
         pmig_obj = copy.deepcopy(self._pmig_generated)

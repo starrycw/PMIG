@@ -1370,6 +1370,7 @@ class PMIG:
     PO_OUTPUT = 0
     PO_UNDEFINED = 1
     PO_JUSTICE = 2
+    PO_OBSOLETE = -1
 
     def __init__(self, name = None, enable_polymorphic = [True, True]):
         self._name = name # Name
@@ -1677,9 +1678,19 @@ class PMIG:
         '''
         Return iterator of POs: (po_id: Order in self._pos, po_fanin: Fan-in literal, po_type == i_type: PO type).
 
+        :param i_type:
         :return: ITERATOR: TUPLE - (po_id, po_fanin, po_type == i_type)
         '''
         return ((po_id, po_fanin, po_type) for po_id, po_fanin, po_type in self.get_iter_pos() if po_type == i_type)
+
+    def get_iter_pos_by_fanin(self, i_fanin):
+        '''
+        Return iterator of POs: (po_id: Order in self._pos, po_fanin == i_fanin: Fan-in literal, po_type: PO type).
+
+        :param i_fanin:
+        :return: ITERATOR: TUPLE - (po_id, po_fanin == i_fanin, po_type)
+        '''
+        return ((po_id, po_fanin, po_type) for po_id, po_fanin, po_type in self.get_iter_pos() if po_fanin == i_fanin)
 
     def get_iter_po_fanins(self):
         '''
@@ -2968,6 +2979,10 @@ class PMIG:
 
         # # Polymorphic
         # self.polymorphic_edgesdict_modify(self.get_po_fanin(po), _MIG_Node.PO, po_type )
+
+    def set_po_obsolete(self, po):
+        assert 0 <= po < self.n_pos()
+        self.set_po_type(po=po, po_type=self.PO_OBSOLETE)
 
 
     # Higher-level boolean ops

@@ -77,7 +77,7 @@ print(pmux1)
 
 print("#####################")
 print(pmux_mig1._pmig_generated)
-pmux_mig1.pmig_generation()
+pmux_mig1.pmig_generation(obsolete_muxed_pos=True)
 print(pmux_mig1._pmig_generated)
 pmig_generated = pmux_mig1.get_pmig_generated()
 writer_mux1 = graphs_io.pmig_writer(pmig_generated)
