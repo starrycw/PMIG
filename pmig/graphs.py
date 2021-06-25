@@ -3477,6 +3477,23 @@ class PMIG:
         # print(nmap._nodemap_original_to_new.items())
         return pmig_new
 
+    def pmig_clean_pos_by_type(self, po_type_tuple = (PO_OBSOLETE, )):
+        '''
+        Remove the POs of specified types.
+
+        :param po_type_tuple: TUPLE - Containing the PO types. eg. (PMIG.PO_OBSOLETE, PMIG.PO_UNDEFINED). Default: (PMIG.PO_OBSOLETE, )
+        :return: PMIG obj
+        '''
+        reserved_po_list = []
+        for po_id, po_fanin, po_type in self.get_iter_pos():
+            if not po_type in po_type_tuple:
+                # print(">>>>>", po_id, po_type, po_fanin)
+                reserved_po_list.append(po_id)
+        # print(reserved_po_list)
+        return self.pmig_clean_irrelevant_nodes(pos=reserved_po_list)
+
+
+
 
 
 

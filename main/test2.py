@@ -78,8 +78,12 @@ print(pmux1)
 print("#####################")
 print(pmux_mig1._pmig_generated)
 pmux_mig1.pmig_generation(obsolete_muxed_pos=True)
+pmux_mig1.opti_clean_pos_by_type()
+
 print(pmux_mig1._pmig_generated)
+# pmig_generated = pmux_mig1.get_pmig_generated_original()
 pmig_generated = pmux_mig1.get_pmig_generated()
+
 writer_mux1 = graphs_io.pmig_writer(pmig_generated)
 writer_mux1.write_to_file('mig_mux1.pmig', path_abc_srcdir, f_comments_list=["Comment example", "abc", "def", "123"])
 
