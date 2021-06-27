@@ -13,6 +13,7 @@ from pmig import convert_to_graph
 from pmig import graphs
 from pmig import graphs_io
 from pmig import graphs_polymorphic
+from pmig import pmig_verification as pmig_veri
 
 # Get global variables from global_vars
 echo_mode = g_vars.get_value("echo_mode")
@@ -86,4 +87,9 @@ pmig_generated = pmux_mig1.get_pmig_generated()
 
 writer_mux1 = graphs_io.pmig_writer(pmig_generated)
 writer_mux1.write_to_file('mig_mux1.pmig', path_abc_srcdir, f_comments_list=["Comment example", "abc", "def", "123"])
+
+pmig_veri1 = pmig_veri.PMIG_Verification(pmig_obj=pmig_generated)
+pmig_veri1.print_pis_id(more_info=True)
+pmig_veri1.change_order_pis([1, 2, 3, 4, 5, 10, 9, 8, 7, 6, 11, 12, 13, 14, 15, 16, 17])
+pmig_veri1.print_pis_id(more_info=True)
 
