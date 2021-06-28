@@ -13,7 +13,12 @@ from prettytable import PrettyTable
 import copy
 
 # Types of node
+
 NTYPE_VARIABLE = 0
+NTYPE_CONST = 1
+
+NTYPELIST_VAR = (NTYPE_VARIABLE, )
+NTYPELIST_FIXED = (NTYPE_CONST, )
 
 # Values of node
 
@@ -22,6 +27,8 @@ NVALUE_1 = 1
 NVALUE_P01 = 2
 NVALUE_P10 = 3
 NVALUE_X = -1
+
+NVALUELIST_ALL = (NVALUE_0, NVALUE_1, NVALUE_P01, NVALUE_P10, NVALUE_X)
 
 
 
@@ -61,6 +68,23 @@ class PMIG_Verification:
                 latches_id.append(node_id)
             node_id = node_id + 1
         return nodes_list, pis_id, latches_id
+
+    def reset_node_value(self):
+        '''
+        Reset the logic values in self._pmig_node_list
+
+        :return:
+        '''
+        new_node_list = []
+        for node_i, nv_value, nv_type in self._pmig_nodes_list:
+            if nv_type in NTYPELIST_VAR:
+                new_node_list.append( [copy.deepcopy(node_i), None, nv_type] )
+            elif nv_type in NTYPELIST_FIXED:
+                new_node_list.append( [copy.deepcopy(node_i), nv_value, nv_type] )
+            else:
+                assert False
+        self._pmig_nodes_list = copy.deepcopy(new_node_list)
+
 
     def print_pis_id(self, more_info = False):
         '''
@@ -117,6 +141,105 @@ class PMIG_Verification:
         for id in new_lat_list:
             assert id in self._latches_id
         self._latches_id = copy.deepcopy(new_lat_list)
+
+    def get_node_with_fixed_value(self):
+        '''
+        Return a list, containing the items that are in self._pmig_nodes_list have fixed logic value.
+
+        :return:
+        '''
+        fixed_nodes_list = []
+        for node_i, nv_value, nv_type in self._pmig_nodes_list:
+            if nv_type in NTYPELIST_FIXED:
+                fixed_nodes_list.append( (node_i, nv_value, nv_type) )
+            else:
+                assert nv_type in NTYPELIST_VAR
+        return fixed_nodes_list
+
+    def nvalue_negated(self, nvalue):
+        assert nvalue in NVALUELIST_ALL
+        if nvalue == NVALUE_0:
+            return NVALUE_1
+        elif nvalue == NVALUE_1:
+            return NVALUE_0
+        elif nvalue == NVALUE_P01:
+            return NVALUE_P10
+        elif nvalue == NVALUE_P10:
+            return NVALUE_P01
+        elif nvalue == NVALUE_X:
+            return NVALUE_X
+        else:
+            assert False
+
+    def nvalue_polymorphic(self, nvalue):
+        assert nvalue in NVALUELIST_ALL
+        if nvalue == NVALUE_0:
+            return NVALUE_P01
+        elif nvalue == NVALUE_1:
+            return NVALUE_P10
+        elif nvalue == NVALUE_P01:
+            return NVALUE_0
+        elif nvalue == NVALUE_P10:
+            return NVALUE_1
+        elif nvalue == NVALUE_X:
+            return NVALUE_X
+        else:
+            assert False
+
+
+
+    def nvalue_calculate_value_of_a_node(self, node_id):
+        '''
+        计算并返回一个node的逻辑值。注意：仅依据get_value_of_a_node获得的扇入值以及该node的类型来确定输出，没有考虑该node的值类型。
+
+        :param node_id: INT -
+        :return: INT
+        '''
+
+        assert 0 <= node_id < len(self._pmig_nodes_list)
+        target_node, nv_value, nv_type = self._pmig_nodes_list[node_id]
+        assert nv_value == None
+
+        # MAJ
+        if target_node.is_maj():
+            ch0_literal = target_node.get_maj_child0()
+            ch1_literal = target_node.get_maj_child1()
+            ch2_literal = target_node.get_maj_child2()
+            ch0_id = ch0_literal >> 2
+            ch0_id = ch1_literal >> 2
+            ch0_id = ch2_literal >> 2
+            ch0_value = self.nvalue_get_value_of_a_node(ch0_id)
+            ch1_value = self.nvalue_get_value_of_a_node(ch1_id)
+            ch2_value = self.nvalue_get_value_of_a_node(ch2_id)
+
+
+
+
+
+    def simu_pos_value(self, pi_vec, latch_vec, allow_node_with_fixed_value = False):
+        '''
+        Assign
+
+        :param pi_vec:
+        :return:
+        '''
+        assert len(pi_vec) == len(self._pis_id)
+        assert len(latch_vec) == len(self._latches_id)
+        self.reset_node_value()
+        # checks
+        fixed_nodes_list = self.get_node_with_fixed_value()
+        if len(fixed_nodes_list) != 0:
+            if allow_node_with_fixed_value:
+                print("[WARNING] pmig_verification.simu_pos_value: _pmig_nodes_list中至少有一个node为固定值，这会导致某些指定的PI向量无效！\n", list(fixed_nodes_list))
+            else:
+                assert False, "[ERROR] pmig_verification.simu_pos_value: _pmig_nodes_list中至少有一个node为固定值，这会导致某些指定的PI向量无效！\n {}".format(list(fixed_nodes_list))
+
+
+
+
+
+
+
 
 
 
