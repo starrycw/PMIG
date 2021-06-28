@@ -186,7 +186,55 @@ class PMIG_Verification:
         else:
             assert False
 
+    def nvalue_add_attr_if_has_attr(self, nvalue, literal):
+        '''
+        如果literal具有取反/多态属性，那么就为nvalue赋予相应的属性。
 
+        :param nvalue: INT -
+        :param literal: INT - Literal
+        :return: INT -
+        '''
+        assert 0 <= nvalue < len(self._pmig_nodes_list)
+        if PMIG.is_negated_literal(literal):
+            nvalue_1 = self.nvalue_negated(nvalue=nvalue)
+        else:
+            nvalue_1 = nvalue
+        if PMIG.is_polymorphic_literal(literal):
+            nvalue_2 = self.nvalue_polymorphic(nvalue=nvalue_1)
+        else:
+            nvalue_2 = nvalue_1
+
+        return nvalue_2
+
+
+    def nvalue_get_value_of_a_node(self, node_id):
+        '''
+        获取一个node的当前逻辑值。如果它已经被赋予逻辑值，或者它的逻辑值已被计算过，那么就直接返回这个值。如果当前它的值为空，那么就调用nvalue_calculate_value_of_a_node。
+
+        :param node_id: INT
+        :return: INT
+        '''
+
+        assert 0 <= node_id < len(self._pmig_nodes_list)
+        target_node, nv_value, nv_type = self._pmig_nodes_list[node_id]
+        if nv_value != None:
+            return nv_value
+        else:
+            return self.nvalue_calculate_value_of_a_node(node_id=node_id)
+
+    def nvalue_calculate_value_of_a_maj(self, ch0, ch1, ch2):
+        '''
+        输入3个逻辑值ch0, ch1, ch2，输出M(ch0, ch1, ch2)。
+
+        :param ch0:
+        :param ch1:
+        :param ch2:
+        :return:
+        '''
+        assert ch0 in NVALUELIST_ALL
+        assert ch1 in NVALUELIST_ALL
+        assert ch2 in NVALUELIST_ALL
+        ???
 
     def nvalue_calculate_value_of_a_node(self, node_id):
         '''
@@ -206,11 +254,32 @@ class PMIG_Verification:
             ch1_literal = target_node.get_maj_child1()
             ch2_literal = target_node.get_maj_child2()
             ch0_id = ch0_literal >> 2
-            ch0_id = ch1_literal >> 2
-            ch0_id = ch2_literal >> 2
+            ch1_id = ch1_literal >> 2
+            ch2_id = ch2_literal >> 2
             ch0_value = self.nvalue_get_value_of_a_node(ch0_id)
             ch1_value = self.nvalue_get_value_of_a_node(ch1_id)
             ch2_value = self.nvalue_get_value_of_a_node(ch2_id)
+            ch0_value_with_attr = self.nvalue_add_attr_if_has_attr(nvalue=ch0_value, literal=ch0_literal)
+            ch1_value_with_attr = self.nvalue_add_attr_if_has_attr(nvalue=ch1_value, literal=ch1_literal)
+            ch2_value_with_attr = self.nvalue_add_attr_if_has_attr(nvalue=ch2_value, literal=ch2_literal)
+            maj_value = self.nvalue_calculate_value_of_a_maj(ch0=ch0_value_with_attr, ch1=ch1_value_with_attr, ch2=ch2_value_with_attr)
+            return maj_value
+
+        # Latch
+        elif target_node.is_latch():
+        ???
+        # Buffer
+        elif target_node.is_buf():
+
+        # PI
+        elif target_node.is_pi():
+
+        # CONST0
+        elif target_node.is_const0():
+
+        #
+        else:
+            assert False
 
 
 
@@ -233,7 +302,7 @@ class PMIG_Verification:
                 print("[WARNING] pmig_verification.simu_pos_value: _pmig_nodes_list中至少有一个node为固定值，这会导致某些指定的PI向量无效！\n", list(fixed_nodes_list))
             else:
                 assert False, "[ERROR] pmig_verification.simu_pos_value: _pmig_nodes_list中至少有一个node为固定值，这会导致某些指定的PI向量无效！\n {}".format(list(fixed_nodes_list))
-
+                ???
 
 
 
