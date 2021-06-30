@@ -21,14 +21,23 @@ NTYPELIST_VAR = (NTYPE_VARIABLE, )
 NTYPELIST_FIXED = (NTYPE_CONST, )
 
 # Values of node
+NBIT_0 = 0
+NBIT_1 = 1
+NBIT_X = -1
 
-NVALUE_0 = 0
-NVALUE_1 = 1
-NVALUE_P01 = 2
-NVALUE_P10 = 3
-NVALUE_X = -1
+NBITLIST_ALL = (NBIT_0, NBIT_1, NBIT_X)
 
-NVALUELIST_ALL = (NVALUE_0, NVALUE_1, NVALUE_P01, NVALUE_P10, NVALUE_X)
+NVALUE_0 = (NBIT_0, NBIT_0)
+NVALUE_1 = (NBIT_1, NBIT_1)
+NVALUE_P01 = (NBIT_0, NBIT_1)
+NVALUE_P10 = (NBIT_1, NBIT_0)
+NVALUE_X = (NBIT_X, NBIT_X)
+NVALUE_PX0 = (NBIT_X, NBIT_0)
+NVALUE_PX1 = (NBIT_X, NBIT_1)
+NVALUE_P0X = (NBIT_0, NBIT_X)
+NVALUE_P1X = (NBIT_1, NBIT_X)
+
+NVALUELIST_ALL = (NVALUE_0, NVALUE_1, NVALUE_P01, NVALUE_P10, NVALUE_X, NVALUE_PX0, NVALUE_PX1, NVALUE_P0X, NVALUE_P1X)
 
 
 
@@ -156,75 +165,172 @@ class PMIG_Verification:
                 assert nv_type in NTYPELIST_VAR
         return fixed_nodes_list
 
-    def nvalue_negated(self, nvalue):
-        assert nvalue in NVALUELIST_ALL
-        if nvalue == NVALUE_0:
-            return NVALUE_1
-        elif nvalue == NVALUE_1:
-            return NVALUE_0
-        elif nvalue == NVALUE_P01:
-            return NVALUE_P10
-        elif nvalue == NVALUE_P10:
-            return NVALUE_P01
-        elif nvalue == NVALUE_X:
-            return NVALUE_X
+    # Logic value of nodes
+    def nvalue_negate_bit(self, b):
+        '''
+        对1bit的逻辑值取反
+
+        :param b:
+        :return:
+        '''
+        assert b in NBITLIST_ALL
+        if b == NBIT_1:
+            return NBIT_0
+        elif b == NBIT_0:
+            return NBIT_1
+        elif b == NBIT_X:
+            return NBIT_X
         else:
             assert False
 
-    def nvalue_polymorphic(self, nvalue):
+    def nvalue_negate(self, nvalue):
+        '''
+        对一个nvalue值（包含2 bits 逻辑值）取反。
+
+        :param nvalue:
+        :return:
+        '''
         assert nvalue in NVALUELIST_ALL
-        if nvalue == NVALUE_0:
-            return NVALUE_P01
-        elif nvalue == NVALUE_1:
-            return NVALUE_P10
-        elif nvalue == NVALUE_P01:
-            return NVALUE_0
-        elif nvalue == NVALUE_P10:
-            return NVALUE_1
-        elif nvalue == NVALUE_X:
-            return NVALUE_X
+        # if nvalue == NVALUE_0:
+        #     return NVALUE_1
+        # elif nvalue == NVALUE_1:
+        #     return NVALUE_0
+        # elif nvalue == NVALUE_P01:
+        #     return NVALUE_P10
+        # elif nvalue == NVALUE_P10:
+        #     return NVALUE_P01
+        # elif nvalue == NVALUE_X:
+        #     return NVALUE_X
+        # elif nvalue == NVALUE_PX0:
+        #     return NVALUE_PX1
+        # elif nvalue == NVALUE_PX1:
+        #     return NVALUE_PX0
+        # elif nvalue == NVALUE_P0X:
+        #     return NVALUE_P1X
+        # elif nvalue == NVALUE_P1X:
+        #     return NVALUE_P0X
+        # else:
+        #     assert False
+        v0 = self.nvalue_negate_bit( nvalue[0] )
+        v1 = self.nvalue_negate_bit( nvalue[1] )
+        nvalue_result = (v0, v1)
+        return nvalue_result
+
+    # def nvalue_polymorphic(self, nvalue):
+    #     assert nvalue in NVALUELIST_ALL
+    #     if nvalue == NVALUE_0:
+    #         return NVALUE_P01
+    #     elif nvalue == NVALUE_1:
+    #         return NVALUE_P10
+    #     elif nvalue in (NVALUE_P01, NVALUE_P0X):
+    #         return NVALUE_0
+    #     elif nvalue == (NVALUE_P10, NVALUE_P1X):
+    #         return NVALUE_1
+    #     elif nvalue in (NVALUE_X, NVALUE_PX0, NVALUE_PX1):
+    #         return NVALUE_X
+    #
+    #     else:
+    #         assert False
+
+    def nvalue_and_bit(self, nbit1, nbit2):
+        '''
+        对两个1 bit逻辑值进行逻辑与
+
+        :param nbit1:
+        :param nbit2:
+        :return:
+        '''
+        assert nbit1 in NBITLIST_ALL
+        assert nbit2 in NBITLIST_ALL
+
+        if ( nbit1 == NBIT_0 ) or ( nbit2 == NBIT_0 ):
+            return NBIT_0
+        elif nbit1 == NBIT_1:
+            return nbit2
+        elif nbit2 == NBIT_1:
+            return nbit1
+        elif ( nbit1 == NBIT_X ) and ( nbit2 == NBIT_X ):
+            return NBIT_X
         else:
             assert False
 
-    def nvalue_add_attr_if_has_attr(self, nvalue, literal):
+    def nvalue_and(self, nvalue1, nvalue2):
         '''
-        如果literal具有取反/多态属性，那么就为nvalue赋予相应的属性。
+        对两个nvalue值（包含2 bits逻辑值）进行逻辑与。
 
-        :param nvalue: INT -
-        :param literal: INT - Literal
-        :return: INT -
+        :param nvalue1:
+        :param nvalue2:
+        :return:
         '''
-        assert 0 <= nvalue < len(self._pmig_nodes_list)
-        if PMIG.is_negated_literal(literal):
-            nvalue_1 = self.nvalue_negated(nvalue=nvalue)
+        assert nvalue1 in NVALUELIST_ALL
+        assert nvalue2 in NVALUELIST_ALL
+        v0 = self.nvalue_and_bit(nbit1=nvalue1[0], nbit2=nvalue2[0])
+        v1 = self.nvalue_and_bit(nbit1=nvalue1[1], nbit2=nvalue2[1])
+        nvalue_result = (v0, v1)
+        return nvalue_result
+
+    def nvalue_or_bit(self, nbit1, nbit2):
+        '''
+        对两个1 bit逻辑值进行逻辑或。
+
+        :param nbit1:
+        :param nbit2:
+        :return:
+        '''
+        assert nbit1 in NBITLIST_ALL
+        assert nbit2 in NBITLIST_ALL
+        if ( nbit1 == NBIT_1 ) or ( nbit2 == NBIT_1 ):
+            return NBIT_1
+        elif nbit1 == NBIT_0:
+            return nbit2
+        elif nbit2 == NBIT_0:
+            return nbit1
+        elif ( nbit1 == NBIT_X ) and ( nbit2 == NBIT_X ):
+            return NBIT_X
         else:
-            nvalue_1 = nvalue
-        if PMIG.is_polymorphic_literal(literal):
-            nvalue_2 = self.nvalue_polymorphic(nvalue=nvalue_1)
-        else:
-            nvalue_2 = nvalue_1
+            assert False
 
-        return nvalue_2
-
-
-    def nvalue_get_value_of_a_node(self, node_id):
+    def nvalue_or(self, nvalue1, nvalue2):
         '''
-        获取一个node的当前逻辑值。如果它已经被赋予逻辑值，或者它的逻辑值已被计算过，那么就直接返回这个值。如果当前它的值为空，那么就调用nvalue_calculate_value_of_a_node。
+        对两个nvalue值（包含2 bits逻辑值）进行逻辑或。
 
-        :param node_id: INT
-        :return: INT
+        :param nvalue1:
+        :param nvalue2:
+        :return:
         '''
+        assert nvalue1 in NVALUELIST_ALL
+        assert nvalue2 in NVALUELIST_ALL
+        v0 = self.nvalue_or_bit(nbit1=nvalue1[0], nbit2=nvalue2[0])
+        v1 = self.nvalue_or_bit(nbit1=nvalue1[1], nbit2=nvalue2[1])
+        nvalue_result = (v0, v1)
+        return nvalue_result
 
-        assert 0 <= node_id < len(self._pmig_nodes_list)
-        target_node, nv_value, nv_type = self._pmig_nodes_list[node_id]
-        if nv_value != None:
-            return nv_value
-        else:
-            return self.nvalue_calculate_value_of_a_node(node_id=node_id)
+
+
+
+    def nvalue_maj_bit(self, bit_ch0, bit_ch1, bit_ch2):
+        '''
+        输入3个1bit逻辑值，返回三个逻辑值的MAJ结果。
+
+        :param bit_ch0:
+        :param bit_ch1:
+        :param bit_ch2:
+        :return:
+        '''
+        assert bit_ch0 in NBITLIST_ALL
+        assert bit_ch1 in NBITLIST_ALL
+        assert bit_ch2 in NBITLIST_ALL
+
+        s01 = self.nvalue_and_bit(nbit1=bit_ch0, nbit2=bit_ch1)
+        s02 = self.nvalue_and_bit(nbit1=bit_ch0, nbit2=bit_ch2)
+        s12 = self.nvalue_and_bit(nbit1=bit_ch1, nbit2=bit_ch2)
+        s01_02 = self.nvalue_or_bit(nbit1=s01, nbit2=s02)
+        s01_02_12 = self.nvalue_or_bit(nbit1=s01_02, nbit2=s12)
+        return s01_02_12
 
     def nvalue_calculate_value_of_a_maj(self, ch0, ch1, ch2):
         '''
-        输入3个逻辑值ch0, ch1, ch2，输出M(ch0, ch1, ch2)。
+        输入3个nvalue逻辑值（包含两个1bit逻辑值）ch0, ch1, ch2，输出M(ch0, ch1, ch2)。
 
         :param ch0:
         :param ch1:
@@ -234,11 +340,100 @@ class PMIG_Verification:
         assert ch0 in NVALUELIST_ALL
         assert ch1 in NVALUELIST_ALL
         assert ch2 in NVALUELIST_ALL
-        ???
+
+        v0 = self.nvalue_maj_bit(bit_ch0=ch0[0], bit_ch1=ch1[0], bit_ch2=ch2[0])
+        v1 = self.nvalue_maj_bit(bit_ch0=ch0[1], bit_ch1=ch1[1], bit_ch2=ch2[1])
+        nvalue_result = (v0, v1)
+        return nvalue_result
+
+    def nvalue_polymorphic(self, nvalue):
+        '''
+        将一个nvalue值（包含两个1bit逻辑值）附加一次多态属性，即(a, b) -> (a, b')
+
+        :param nvalue:
+        :return:
+        '''
+        assert nvalue in NVALUELIST_ALL
+        v0 = nvalue[0]
+        v1 = self.nvalue_negate_bit(b=nvalue[1])
+        nvalue_result = (v0, v1)
+        return nvalue_result
+
+    def nvalue_update_value_of_a_node(self, node_id, node_value, enforce = False, replace = False):
+        '''
+        更新_pmig_nodes_list中记录的某个node的逻辑值。
+
+        选项：
+
+        enforce：若为True，则无视逻辑值类型是否为NTYPELIST_VAR，强制更改逻辑值。默认为False。
+
+        replace：若为True，则允许替换已有的逻辑值。默认为False，即只允许在原逻辑值为None时更改。
+
+        :param node_id:
+        :param node_value:
+        :param enforce:
+        :param replace:
+        :return:
+        '''
+        assert 0 <= node_id < len(self._pmig_nodes_list)
+        target_node, nv_value, nv_type = self._pmig_nodes_list[node_id]
+        if not enforce:
+            assert nv_type in NTYPELIST_VAR
+        if not replace:
+            assert nv_value is None
+        new_tuple = (target_node, node_value, nv_type)
+        self._pmig_nodes_list[node_id] = new_tuple
+
+
+    def nvalue_get_value_of_a_node(self, node_id):
+        '''
+        获取一个node的当前逻辑值。如果它已经被赋予逻辑值，或者它的逻辑值已被计算过，那么就直接返回这个值。如果当前它的值为空，那么就调用nvalue_calculate_value_of_a_node，并更新它的值。
+
+        :param node_id: INT
+        :return: INT
+        '''
+
+        assert 0 <= node_id < len(self._pmig_nodes_list)
+        target_node, nv_value, nv_type = self._pmig_nodes_list[node_id]
+        if nv_value is not None:
+            return nv_value
+        else:
+            new_value = self.nvalue_calculate_value_of_a_node(node_id=node_id)
+            self.nvalue_update_value_of_a_node(node_id=node_id, node_value=new_value, enforce=False, replace=False)
+            return new_value
+
+    def nvalue_get_nvalue_with_attr(self, literal):
+        '''
+        Get the logic value of a literal.
+        首先得到相应node的逻辑值，然后附加上literal所具有的属性。
+
+        :param literal:
+        :return:
+        '''
+        target_id = literal >> 2
+        target_node_obj, nv_value, nv_type = self._pmig_nodes_list[target_id]
+        assert target_node_obj == self._pmig_obj.attribute_nodes_get_copy(target_id)
+
+        if nv_value is None:
+            v = self.nvalue_get_value_of_a_node(node_id=target_id)
+        else:
+            v = nv_value
+
+        if PMIG.is_negated_literal(literal):
+            v_ne = self.nvalue_negate(nvalue=v)
+        else:
+            v_ne = v
+
+        if PMIG.is_polymorphic_literal(literal):
+            v_ne_po = self.nvalue_polymorphic(nvalue=v_ne)
+        else:
+            v_ne_po = v_ne
+
+        return v_ne_po
 
     def nvalue_calculate_value_of_a_node(self, node_id):
         '''
-        计算并返回一个node的逻辑值。注意：仅依据get_value_of_a_node获得的扇入值以及该node的类型来确定输出，没有考虑该node的值类型。
+        计算并返回一个node的逻辑值。注意：仅依据get_value_of_a_node获得的扇入值以及该node的类型来确定输出，没有考虑在当前仿真中该node本身是否被固定为了某个值。
 
         :param node_id: INT -
         :return: INT
@@ -246,23 +441,19 @@ class PMIG_Verification:
 
         assert 0 <= node_id < len(self._pmig_nodes_list)
         target_node, nv_value, nv_type = self._pmig_nodes_list[node_id]
-        assert nv_value == None
+        assert nv_value is None
+        assert target_node == self._pmig_obj.attribute_nodes_get_copy(node_id)
+        assert isinstance(target_node, graphs._MIG_Node)
 
         # MAJ
         if target_node.is_maj():
             ch0_literal = target_node.get_maj_child0()
             ch1_literal = target_node.get_maj_child1()
             ch2_literal = target_node.get_maj_child2()
-            ch0_id = ch0_literal >> 2
-            ch1_id = ch1_literal >> 2
-            ch2_id = ch2_literal >> 2
-            ch0_value = self.nvalue_get_value_of_a_node(ch0_id)
-            ch1_value = self.nvalue_get_value_of_a_node(ch1_id)
-            ch2_value = self.nvalue_get_value_of_a_node(ch2_id)
-            ch0_value_with_attr = self.nvalue_add_attr_if_has_attr(nvalue=ch0_value, literal=ch0_literal)
-            ch1_value_with_attr = self.nvalue_add_attr_if_has_attr(nvalue=ch1_value, literal=ch1_literal)
-            ch2_value_with_attr = self.nvalue_add_attr_if_has_attr(nvalue=ch2_value, literal=ch2_literal)
-            maj_value = self.nvalue_calculate_value_of_a_maj(ch0=ch0_value_with_attr, ch1=ch1_value_with_attr, ch2=ch2_value_with_attr)
+            ch0 = self.nvalue_get_nvalue_with_attr(literal=ch0_literal)
+            ch1 = self.nvalue_get_nvalue_with_attr(literal=ch1_literal)
+            ch2 = self.nvalue_get_nvalue_with_attr(literal=ch2_literal)
+            maj_value = self.nvalue_calculate_value_of_a_maj(ch0=ch0, ch1=ch1, ch2=ch2)
             return maj_value
 
         # Latch

@@ -43,6 +43,19 @@ class _MIG_Node:
         self._child1 = child1
         self._child2 = child2
 
+    def __eq__(self, other):
+        if not isinstance(other, _MIG_Node):
+            return False
+        if self._type != other._type:
+            return False
+        if self._child0 != other._child0:
+            return False
+        if self._child1 != other._child1:
+            return False
+        if self._child2 != other._child2:
+            return False
+        return True
+
 
 
     # creation
@@ -350,6 +363,7 @@ class _MIG_Node:
 #     (1) L[1]: L[1] = 1 if the literal represents an output edge with polymorphic attribute. L[1] = 0 if not.
 #     (2) L[0]: L[0] = 1 if the literal has negative attribute (in NORMAL mode if L[1] = 1). L[0] = 0 if not.
 #
+# 注意：这里所谓的“多态属性”是指“保持模式1的逻辑值不变，将模式2的逻辑值取反”。如果一个node的逻辑值为a/b，那么附加一个多态属性后，逻辑值为a/b'。
 ########################################################################################################################
 class PMIG:
 
@@ -398,8 +412,14 @@ class PMIG:
     # self._polymorphic_flag
 
     def attribute_get_nodes_list(self):
+        '''
+        Return copy.deepcopy(self._nodes)
+
+        :return:
+        '''
         nodeslist = copy.deepcopy(self._nodes)
         return nodeslist
+
     def is_polymorphic_allowed(self):
         '''
         If at least one of "polymorphic-nodes" and "polymorphic-edges" are allowed.
@@ -497,7 +517,24 @@ class PMIG:
 
 
     # self._nodes
+    def attribute_nodes_get_copy(self, n):
+        '''
+        Return return self._nodes[n]
+
+        :param n:
+        :return:
+        '''
+        n_copy = copy.deepcopy(self.attribute_nodes_get(n=n))
+        return n_copy
+
     def attribute_nodes_get(self, n):
+        '''
+        Return return self._nodes[n]
+
+        :param n:
+        :return:
+        '''
+        assert 0 <= n < len(self._nodes)
         return self._nodes[n]
 
     def attribute_nodes_set(self, n, value):
@@ -2390,7 +2427,7 @@ class PMIG:
         :return:
         '''
         nmap = PMIG.node_map()
-        if pos == None:
+        if pos is None:
             # print(self.n_pos())
             pos = range(0, self.n_pos())
         pos_set = set(pos)

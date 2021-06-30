@@ -84,7 +84,7 @@ def set_value_ifundefined(name, value):
     :param value: Any - Variable value
     :return: Current value of this variable.
     '''
-    if _global_dict.get(name) == None:
+    if _global_dict.get(name) is None:
         set_value(name, value)
 
 def set_cnt(name, add_value):
@@ -97,7 +97,7 @@ def set_cnt(name, add_value):
 
     :return: Int - Current cnt value
     '''
-    if _global_dict.get(name) == None:
+    if _global_dict.get(name) is None:
         set_value(name, 0)
     if add_value == 0:
         set_value(name, 0)

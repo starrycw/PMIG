@@ -247,7 +247,7 @@ class PMIG_Generation:
         :param fanin_list:
         :return:
         '''
-        if fanin_list == None:
+        if fanin_list is None:
             n_pos_min = self._mig_a.n_pos()
             if self._mig_b.n_pos() < self._mig_a.n_pos():
                 n_pos_min = self._mig_b.n_pos()
@@ -264,7 +264,7 @@ class PMIG_Generation:
         :param pi_list:
         :return:
         '''
-        if pi_list == None:
+        if pi_list is None:
             n_pis_min = self._mig_a.n_pis()
             if self._mig_b.n_pis() < self._mig_a.n_pis():
                 n_pis_min = self._mig_b.n_pis()
@@ -479,7 +479,7 @@ class PMIG_Generation:
         l_ctl = self._pmux_literals['ctl']
         l_pis = self._pmux_literals['PI']
         # l_pis_shared = self._pmux_literals['shared_PI']
-        if l_pis != None:
+        if l_pis is not None:
             for l_pi in l_pis:
                 new_l = self._pmig_generated.create_pi()
                 map_mux_to_new[l_pi] = new_l
@@ -491,7 +491,7 @@ class PMIG_Generation:
             if self._pmux.is_const0(l):
                 assert l == self._pmux.get_literal_const0()
             elif self._pmux.is_pi(l):
-                if l_pis != None:
+                if l_pis is not None:
                     assert (l in l_pis) or (l in (l_mux_a, l_mux_b, l_ctl))
                 else:
                     assert l in (l_mux_a, l_mux_b, l_ctl)

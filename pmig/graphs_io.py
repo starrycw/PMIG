@@ -129,14 +129,14 @@ class pmig_writer:
     #                 f.write("{} {}\n".format(po_iter[0], self._pmig_obj.get_name_by_po(po_iter[0])))
 
     def write_comments(self, f):
-        if self._comments != None:
+        if self._comments is not None:
             f.write("# Comments:\n")
             for c_line in self._comments:
                 f.write('# ' + c_line + '\n')
 
     def write_to_file(self, f_name, f_path = ".", f_comments_list = None):
         #if not os.path.exists(f_path + '/' + f_name):
-        if f_comments_list != None:
+        if f_comments_list is not None:
             self._comments = f_comments_list
 
 
