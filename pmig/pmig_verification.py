@@ -45,7 +45,7 @@ class PMIG_Verification:
     def __init__(self, pmig_obj):
         assert isinstance(pmig_obj, PMIG)
         self._pmig_obj = pmig_obj
-        self._pmig_nodes_list, self._pis_id, self._latches_id = self.init_pmig_nodes_list()
+        self._pmig_nodes_list, self._pis_id, self._latches_id = self.return_pmig_nodes_list()
         # self._pmig_nodes_list：
         #     该列表应当包含self._pmig_obj中所有的nodes信息，每个元素为一个元组： (_MIG_Node对象, 逻辑值， 逻辑值类型)。
         #     逻辑值指的是在目前的仿真中该node具体的逻辑值（定义为NVALUE_xxx，默认应为None，即还未赋值）；逻辑值类型指的是该node在当前仿真中的角色（定义为NTYPE_xxx， 默认应当为NTYPE_VARIABLE，即普通变量）
@@ -56,8 +56,13 @@ class PMIG_Verification:
         #     列表中应当包含所有的PI和latch位置，不能遗漏。
         #     PI/latch在列表中的顺序决定了相应变量在输入向量和输出向量中的位置。
         #     如果要调整顺序，可以使用print_pis_id来显示列表详情，然后使用change_order_pis和change_order_latches，输入新列表。
+    def reset_all(self):
+        new_pmig_nodes_list, new_pis_id, new_latches_id = self.return_pmig_nodes_list()
+        self._pmig_nodes_list = copy.deepcopy(new_pmig_nodes_list)
+        self._pis_id = copy.deepcopy(new_pis_id)
+        self._latches_id = copy.deepcopy(new_latches_id)
 
-    def init_pmig_nodes_list(self):
+    def return_pmig_nodes_list(self):
         '''
         Return the list of all nodes, the list of PIs id, and the list of latches id.
 
@@ -78,9 +83,47 @@ class PMIG_Verification:
             node_id = node_id + 1
         return nodes_list, pis_id, latches_id
 
+    def return_pmig_pos_list(self, returnmode=None):
+        '''
+        Return the list of all POs.
+
+        :return: LIST - List with TUPLE elements: (po_fanin, PO_type)
+        '''
+
+        pos_list = []
+        pos_fanin_list = []
+        for po_id, po_fanin, po_type in self._pmig_obj.get_iter_pos():
+            po_name = self._pmig_obj.get_name_by_po_if_has(po_id)
+            pos_list.append( (po_fanin, po_type, (po_id, po_name)) )
+            pos_fanin_list.append(po_fanin)
+        if returnmode == 'fanins_only':
+            return pos_fanin_list
+        else:
+            return pos_list
+
+    def return_latch_fanin_as_po(self):
+        '''
+        将latch的fanin作为PO列表返回。返回值格式与return_pmig_pos_list相同。
+
+        :return:
+        '''
+        latch_pos = []
+        for l_literal in self._pmig_obj.get_iter_latches():
+            l_fanin = self._pmig_obj.get_latch_next(l=l_literal)
+            l_name = None
+            if self._pmig_obj.has_name(l_literal):
+                l_name = self._pmig_obj.get_name_by_id(l_literal)
+            current_fanin_list = self.return_pmig_pos_list(returnmode='fanins_only')
+            if not (l_fanin in current_fanin_list):
+                latch_pos.append( (l_fanin, 'latch', ('latch_fanin', l_name)) )
+        return latch_pos
+
+
     def reset_node_value(self):
         '''
         Reset the logic values in self._pmig_node_list
+        在一次仿真中，设置不同的输入向量之前，先通过本方法使得所有的可变nvalue值变为None。
+        注意：本方法不会改变非可变的nvalue值，例如，被固定为某个逻辑值的node，仍然被固定在该逻辑值。
 
         :return:
         '''
@@ -337,7 +380,7 @@ class PMIG_Verification:
         :param ch2:
         :return:
         '''
-        assert ch0 in NVALUELIST_ALL
+        assert ch0 in NVALUELIST_ALL #, "ch0, value={}, is_int={}, xx{}".format(ch0, isinstance(ch0, int), isinstance(NVALUE_0, int))
         assert ch1 in NVALUELIST_ALL
         assert ch2 in NVALUELIST_ALL
 
@@ -458,15 +501,27 @@ class PMIG_Verification:
 
         # Latch
         elif target_node.is_latch():
-        ???
+            assert False
+            init_literal = target_node.get_latch_init()
+            next_literal = target_node.get_latch_next()
+            # 目前对latch的处理方式是：只考虑next，忽略init
+            latch_value = self.nvalue_get_nvalue_with_attr(literal=next_literal)
+            return latch_value
+
         # Buffer
-        elif target_node.is_buf():
+        elif target_node.is_buffer():
+            bufin_literal = target_node.get_buf_in()
+            buf_value = self.nvalue_get_nvalue_with_attr(literal=bufin_literal)
+            return buf_value
 
         # PI
         elif target_node.is_pi():
+            assert False, "[ERROR] pmig_variation: PI的逻辑值为空！"
 
         # CONST0
         elif target_node.is_const0():
+            # return graphs._MIG_Node.CONST0
+            return NVALUE_0
 
         #
         else:
@@ -476,12 +531,20 @@ class PMIG_Verification:
 
 
 
-    def simu_pos_value(self, pi_vec, latch_vec, allow_node_with_fixed_value = False):
+    def simu_pos_value(self, pi_vec, latch_vec, pos_selected=None, allow_node_with_fixed_value = False):
         '''
-        Assign
+        输入PI逻辑值pi_vec，latch逻辑值latch_vec，以及要输出的PO列表。
+
+        其中，对于PO列表pos_selected来说，它应当是一个列表或元组，其中每个元素对应一个PO的信息，也为元组，包含4个元素：(po_value, po_fanin, po_type, po_info_tuple)。
+        其中po_info_tuple可以储存PO的信息（前两个元素应当分别为id和name）。pos_selected默认为None，即自动获取所有PO。
+
+        PI逻辑值pi_vec以及latch逻辑值latch_vec都应当为列表或元组，并且元素个数应当恰好等于self._pis_id和self._latches_id中的元素数，每个元素都应该是NVALUELIST_ALL中定义过的逻辑值。
+
+        allow_node_with_fixed_value默认为False，这意味着如果图中的某个node的nvalue类型为不变类型，会引发异常。
+        如果为True，则只会显示警告文字。需要注意的是：按照目前的算法，某个node被固定为某个逻辑值的优先级大于设置PI的逻辑值，即可能会导致某些PI的逻辑值被屏蔽。
 
         :param pi_vec:
-        :return:
+        :return: LIST, LIST, LIST - The first LIST contains tuple: (po_value, po_fanin, po_type)
         '''
         assert len(pi_vec) == len(self._pis_id)
         assert len(latch_vec) == len(self._latches_id)
@@ -493,7 +556,125 @@ class PMIG_Verification:
                 print("[WARNING] pmig_verification.simu_pos_value: _pmig_nodes_list中至少有一个node为固定值，这会导致某些指定的PI向量无效！\n", list(fixed_nodes_list))
             else:
                 assert False, "[ERROR] pmig_verification.simu_pos_value: _pmig_nodes_list中至少有一个node为固定值，这会导致某些指定的PI向量无效！\n {}".format(list(fixed_nodes_list))
-                ???
+        # Set PI value
+        idx = 0
+        for pi_value_i in pi_vec:
+            assert pi_value_i in NVALUELIST_ALL
+            node_idx = self._pis_id[idx]
+            target_node, nv_value, nv_type = self._pmig_nodes_list[node_idx]
+            assert nv_type == NTYPE_VARIABLE
+            assert nv_value is None
+            self.nvalue_update_value_of_a_node(node_id=node_idx, node_value=pi_value_i)
+            idx = idx + 1
+        # Set LATCH value
+        idx = 0
+        for latch_value_i in latch_vec:
+            node_idx = self._latches_id[idx]
+            target_node, nv_value, nv_type = self._pmig_nodes_list[node_idx]
+            assert nv_type == NTYPELIST_VAR
+            assert nv_value is None
+            self.nvalue_update_value_of_a_node(node_id=node_idx, node_value=latch_value_i)
+            idx = idx + 1
+
+
+        if pos_selected is None:
+            pos_selected = self.return_pmig_pos_list()
+            for latch_po_i in self.return_latch_fanin_as_po():
+                pos_selected.append(latch_po_i)
+        result_pos_value = []
+        for po_fanin, po_type, po_info_tuple in pos_selected:
+            po_value = self.nvalue_get_nvalue_with_attr(literal=po_fanin)
+            result_pos_value.append( (po_value, po_fanin, po_type, po_info_tuple) )
+
+        return result_pos_value, pos_selected, pi_vec
+
+    def run_simu(self, mode=None):
+        if mode is None:
+            result_list = []
+            pos_list = None
+            pi_len = len(self._pis_id)
+            latch_len = len(self._latches_id)
+            vec_max = pow( 2, (pi_len + latch_len) )
+            for vec_value in range(0, vec_max):
+                vec_bin = bin(vec_value)[2:]
+                vec_tuple = tuple( str.zfill( vec_bin, (pi_len+latch_len) ) )
+                # print(len(vec_tuple), pi_len, latch_len)
+                assert len(vec_tuple) == pi_len + latch_len
+                vec_pi_tuple = vec_tuple[:pi_len]
+                vec_latch_tuple = vec_tuple[pi_len:]
+                pi_vec = []
+                latch_vec = []
+                for i in vec_pi_tuple:
+                    if int(i) == 0:
+                        pi_vec.append(NVALUE_0)
+                    elif int(i) == 1:
+                        pi_vec.append(NVALUE_1)
+                    else:
+                        assert False
+                for i in vec_latch_tuple:
+                    if int(i) == 0:
+                        latch_vec.append(NVALUE_0)
+                    elif int(i) == 1:
+                        latch_vec.append(NVALUE_1)
+                    else:
+                        assert False
+                result_pos_value, pos_selected, pi_vec = self.simu_pos_value(pi_vec=pi_vec, latch_vec=latch_vec, allow_node_with_fixed_value=False)
+                if vec_value == 0:
+                    assert pos_list is None
+                    pos_list = copy.deepcopy(pos_selected)
+                else:
+                    assert pos_selected == pos_list
+                result_list.append(result_pos_value)
+                print("PI:{}, latch:{}, result:{}".format(pi_vec, latch_vec, result_pos_value))
+            # 整理结果
+            pos_nvalue = []
+            for nvalue_i in result_list:
+                pos_ii = []
+                for ii in nvalue_i:
+                    pos_ii.append(ii[0])
+                pos_nvalue.append( tuple(pos_ii) )
+            nvalue_by_pi_vec = tuple(pos_nvalue)
+            # return
+            info_temp = []
+            for pis_id_i in self._pis_id:
+                pis_name = None
+                pis_literal = pis_id_i << 2
+                if self._pmig_obj.has_name(pis_literal):
+                    pis_name = self._pmig_obj.get_name_by_id(pis_literal)
+                info_temp.append( (pis_id_i, pis_name) )
+            simu_info_pis = copy.deepcopy(info_temp)
+            info_temp = []
+            for lats_id_i in self._latches_id:
+                lats_name = None
+                lats_literal = lats_id_i << 2
+                if self._pmig_obj.has_name(lats_literal):
+                    lats_name = self._pmig_obj.get_name_by_id(lats_literal)
+                lats_init = self._pmig_obj.get_latch_init(lats_literal)
+                lats_next = self._pmig_obj.get_latch_next(lats_literal)
+                info_temp.append((lats_id_i, lats_name, lats_init, lats_next))
+            simu_info_latches = copy.deepcopy(info_temp)
+            simu_info_pos = copy.deepcopy(pos_list)
+            # 返回值包括：
+            #
+            #    (simu_info_pis, simu_info_latches, simu_info_pos)分别是本次仿真时的配置，包括Input vector所对应的pi和latch，以及所监测的po。
+            #    其中，simu_info_pis中每一个元素为(PI的id， PI的name)
+            #    simu_info_latches中每一个元素为(latch的id， latch的name， latch的init， latch的next)
+            #    simu_info_pos中每一个元素为(fanin, type, info)
+            #
+            #    result_list是PO的逻辑值，格式为[ [vec0下第1个PO的信息, vec0下第2个PO的信息, ...], [vec1下第1个PO的信息, vec1下第2个PO的信息, ...] ]，
+            #    其中veci下第j个PO的信息为一个元组: (逻辑值，对应literal， PO type， id和name等信息)
+            #
+            #    nvalue_by_pi_vec则是整理后的PO的逻辑值，它是一个元组，每一个元素都代表了一种输入向量下的PO值，是一个包含各个PO逻辑值的元组
+            return ( simu_info_pis, simu_info_latches, simu_info_pos ), result_list, nvalue_by_pi_vec
+
+
+
+
+
+
+
+
+
 
 
 

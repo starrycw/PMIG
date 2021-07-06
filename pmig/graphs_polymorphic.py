@@ -471,12 +471,23 @@ class PMIG_Generation:
             self._pmig_generated.create_po(f=new_fanin, name=new_name, po_type=new_type)
 
     def _create_mux(self, fanin_a, fanin_b, obsolete_muxed_pos = False):
+        '''
+        注意： 若self._pmux_literals中存在‘ctl’项，那么将其映射为0/1。若不存在，则不映射。
+
+        :param fanin_a:
+        :param fanin_b:
+        :param obsolete_muxed_pos:
+        :return:
+        '''
         assert isinstance(self._pmig_generated, PMIG)
         assert isinstance(self._pmux, PMIG)
         map_mux_to_new = {self._pmux.get_literal_const0(): self._pmig_generated.get_literal_const0()}
         l_mux_a = self._pmux_literals['fanin_A']
         l_mux_b = self._pmux_literals['fanin_B']
-        l_ctl = self._pmux_literals['ctl']
+        if 'ctl' in self._pmux_literals:
+            l_ctl = self._pmux_literals['ctl']
+        else:
+            l_ctl = None
         l_pis = self._pmux_literals['PI']
         # l_pis_shared = self._pmux_literals['shared_PI']
         if l_pis is not None:
@@ -485,16 +496,23 @@ class PMIG_Generation:
                 map_mux_to_new[l_pi] = new_l
         map_mux_to_new[l_mux_a] = fanin_a
         map_mux_to_new[l_mux_b] = fanin_b
-        map_mux_to_new[l_ctl] = self._pmig_generated.get_literal_const_0_1()
+        if l_ctl is not None:
+            map_mux_to_new[l_ctl] = self._pmig_generated.get_literal_const_0_1()
         # Nodes
         for l in self._pmux.get_iter_nodes_all():
             if self._pmux.is_const0(l):
                 assert l == self._pmux.get_literal_const0()
             elif self._pmux.is_pi(l):
                 if l_pis is not None:
-                    assert (l in l_pis) or (l in (l_mux_a, l_mux_b, l_ctl))
+                    if l_ctl is None:
+                        assert (l in l_pis) or (l in (l_mux_a, l_mux_b))
+                    else:
+                        assert (l in l_pis) or (l in (l_mux_a, l_mux_b, l_ctl))
                 else:
-                    assert l in (l_mux_a, l_mux_b, l_ctl)
+                    if l_ctl is None:
+                        assert l in (l_mux_a, l_mux_b, l_ctl)
+                    else:
+                        assert l in (l_mux_a, l_mux_b, l_ctl)
 
             elif self._pmux.is_maj(l):
                 ch0 = self._pmux.get_maj_child0(l)
@@ -594,9 +612,13 @@ class PMIG_Generation:
         assert isinstance(pmig_obj, PMIG)
         return pmig_obj
 
+# 优化方法opti_xxx，以及优化所需的对生成的图进行操作的方法op_xxx
+
     def opti_clean_pos_by_type(self, po_type_tuple=(PMIG.PO_OBSOLETE, )):
         assert isinstance(self._pmig_generated_opti, PMIG)
         self._pmig_generated_opti = self._pmig_generated_opti.pmig_clean_pos_by_type(po_type_tuple=po_type_tuple)
+
+
 
 
 
@@ -621,7 +643,7 @@ class PMIG_PNode(PMIG_Generation):
         '''
         Get a PMIG obj of a 2 to 1 MUX, with 3 PIs: "mig_a", "mig_b" and "ctl"(select signal), and a 1 output: "mux_PO".
 
-        :return: PMIG_obj, TUPLE - The PMIG of 2 to 1 MUX, and a tuple with 3 literal: (literal of "mig_a", literal of "mig_b", and literal of "mig_c").
+        :return: PMIG_obj, DICT - The PMIG of 2 to 1 MUX, and a dict.
         '''
         pmux = PMIG(enable_polymorphic=[False, False])
         literal_a = pmux.create_pi(name='mig_a')
@@ -642,6 +664,21 @@ class PMIG_PEdge(PMIG_Generation):
     def reset_pmig(self):
         self._pmig_generated = PMIG(enable_polymorphic=(True, False))
         self._pmig_generated_opti = PMIG(enable_polymorphic=(True, False))
+
+    def get_pmux(self):
+        '''
+        Get a PMIG obj of a 2 to 1 MUX with polymorphic edges, with 2 PIs: "mig_a", "mig_b" , and a 1 output: "mux_PO".
+
+        :return: PMIG_obj, DICT - The PMIG of 2 to 1 MUX, and a dict.
+        '''
+        pmux = PMIG(enable_polymorphic=[True, False])
+        literal_a = pmux.create_pi(name='mig_a')
+        literal_b = pmux.create_pi(name='mig_b')
+        literal_ac = pmux.create_maj(literal_a, pmux.get_literal_const0(), pmux.get_literal_const_1_0()) # M(a, 0, 1/0)
+        literal_bc = pmux.create_maj(literal_b, pmux.get_literal_const0(), pmux.get_literal_const_0_1()) # M(b, 0, 0/1)
+        literal_abc = pmux.create_maj(literal_ac, literal_bc, pmux.get_literal_const1()) # M( M(a, 0, 1/0), M(b, 0, 0/1), 1)
+        pmux.create_po(literal_abc, name="mux_PO")
+        return pmux, {'fanin_A':literal_a, 'fanin_B':literal_b, 'PI':None}
 
 
 

@@ -22,9 +22,8 @@ print(path_abc_srcdir)
 path_aiger_dir = g_vars.get_value("path_aiger_dir")
 
 # Set Variables
-# path_abc_srcfile = "rca2.v"
-path_abc_srcfile = "ripple_8.blif"
-
+path_abc_srcfile = "rca2.v"
+#path_abc_srcfile = "ripple_8.blif"
 
 status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", "rewrite"), echo_mode)
 print(status, warnings)
@@ -33,63 +32,52 @@ aig_1 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
 aig_1.fill_pi_names()
 aig_1.fill_po_names()
 
-
 mig_1 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_1)
 print(mig_1)
 
-writer_1 = graphs_io.pmig_writer(mig_1)
-writer_1.write_to_file('mig_1.pmig', path_abc_srcdir, f_comments_list=["Comment example", "abc", "def", "123"])
-writer_1.write_to_file('mig_01.pmig', path_abc_srcdir, f_comments_list=["Comment example", "abc", "def", "123"])
+# Set Variables
+path_abc_srcfile = "rca2_inv.v"
+#path_abc_srcfile = "ripple_8.blif"
 
-reader_1 = graphs_io.pmig_reader()
-mig_1_1 = reader_1.read_pmig(path_abc_srcdir + '/' + 'mig_1.pmig')
+status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", "rewrite"), echo_mode)
+print(status, warnings)
 
-reader_2 = graphs_io.pmig_reader()
-mig_2 = reader_2.read_pmig(path_abc_srcdir + '/' + 'mig_2.pmig')
+aig_2 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
+aig_2.fill_pi_names()
+aig_2.fill_po_names()
 
-print(mig_1 == mig_1_1)
+mig_2 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_2)
+print(mig_2)
 
-mig_1_1.create_po(8)
-mig_1_1.create_po(4)
+pnode_muxed = graphs_polymorphic.PMIG_PEdge(mig1=mig_1, mig2=mig_2)
+pnode_muxed.set_mux_auto()
+pnode_muxed.set_merged_pis_auto()
+pnode_muxed.pmig_generation(obsolete_muxed_pos=True)
 
-for i in mig_2.get_iter_pos_with_polymorphic_fanin():
-    print('xxx', i)
+mig_muxed = pnode_muxed.get_pmig_generated_original()
+print(mig_muxed)
+mig_muxed = mig_muxed.pmig_clean_pos_by_type()
+print(mig_muxed)
 
-pmux_mig1 = graphs_polymorphic.PMIG_PNode(mig_1, mig_2)
-pmux_mig1.print_pos_of_mig()
-pmux_mig1.print_pis_of_mig()
-mux_fanin_table1 = pmux_mig1.mux_fanin_list_get()
-pmux_mig1.set_mux_auto()
-pmux_mig1.set_merged_pis_auto()
-mux_fanin_table2 = pmux_mig1.mux_fanin_list_get()
-
-
-print(mux_fanin_table1)
-print(mux_fanin_table2)
-print(pmux_mig1.mux_fanin_list_get())
-print(pmux_mig1.mux_fanin_list_add(( (1, 2), (7, 6)) ))
-print("Merged_pis: ", pmux_mig1.merged_pis_list_get())
-# print(pmux_mig1.mux_fanin_list_get())
-# print(pmux_mig1.mux_fanin_list_remove( ((1, 1), (8, 4), (2, 2)) ))
-# print(pmux_mig1.mux_fanin_list_get())
-
-pmux1 = pmux_mig1._pmux
-print(pmux1)
-
-print("#####################")
-print(pmux_mig1._pmig_generated)
-pmux_mig1.pmig_generation(obsolete_muxed_pos=True)
-pmux_mig1.opti_clean_pos_by_type()
-
-print(pmux_mig1._pmig_generated)
-# pmig_generated = pmux_mig1.get_pmig_generated_original()
-pmig_generated = pmux_mig1.get_pmig_generated()
-
-writer_mux1 = graphs_io.pmig_writer(pmig_generated)
-writer_mux1.write_to_file('mig_mux1.pmig', path_abc_srcdir, f_comments_list=["Comment example", "abc", "def", "123"])
-
-pmig_veri1 = pmig_veri.PMIG_Verification(pmig_obj=pmig_generated)
+pmig_veri1 = pmig_veri.PMIG_Verification(pmig_obj=mig_muxed)
 pmig_veri1.print_pis_id(more_info=True)
-pmig_veri1.change_order_pis([1, 2, 3, 4, 5, 10, 9, 8, 7, 6, 11, 12, 13, 14, 15, 16, 17])
-pmig_veri1.print_pis_id(more_info=True)
+simu_info, simu_result, simu_result_xx = pmig_veri1.run_simu()
+print(simu_info[0])
+print(simu_info[1])
+print(simu_info[2])
+print(len(simu_result))
+print(simu_result)
+print(simu_result_xx)
+
+# mig_new = mig_1.pmig_clean_irrelevant_nodes()
+#
+# pmig_veri2 = pmig_veri.PMIG_Verification(pmig_obj=mig_new)
+# pmig_veri2.print_pis_id(more_info=True)
+# simu_result2 = pmig_veri2.run_simu()
+# print(len(simu_result2))
+# print(simu_result2)
+#
+# print(simu_result == simu_result2)
+# print(simu_result is simu_result2)
+
 
