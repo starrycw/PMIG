@@ -378,7 +378,7 @@ class PMIG:
     PO_JUSTICE = 2
     PO_OBSOLETE = -1
 
-    def __init__(self, name = None, enable_polymorphic = [True, True]):
+    def __init__(self, name = None, enable_polymorphic = [True, True], allow_buffer_type_node = True):
         self._name = name # Name
         self._strash = {} # Structural hashing table
         self._pis = [] # Literals of PIs (positive and non-polyedged)
@@ -391,6 +391,7 @@ class PMIG:
         self._po_to_name = {} # PO-to-Name mapping.
         self._name_to_po = {} # Name-to-PO mapping.
         self._fanouts = {}
+        self._allow_buffer = allow_buffer_type_node
         # self._polymorphic_edges = {} # Contains all the nodes with polymorphic-edge as child.
                              # The key is the id of node and must be a literal.
                              # It must be positive and non-polymorphic literal if and only if the type is _MIG_Node.PO.
@@ -498,11 +499,15 @@ class PMIG:
         return self._buffers[n]
 
     def attribute_buffers_append(self, value):
+        if not self._allow_buffer:
+            assert False
         assert not (self.is_negated_literal(value) or self.is_polymorphic_literal(value))
         assert isinstance(value, int)
         return self._buffers.append(value)
 
     def attribute_buffers_set(self, n, value):
+        if not self._allow_buffer:
+            assert False
         if value == -1:
             self.attribute_buffers_del(n)
         else:
@@ -1607,6 +1612,8 @@ class PMIG:
         :param name: STRING - Name
         :return: INT - Literal of the buffer
         '''
+        if not self._allow_buffer:
+            assert False
         # Polymorphic Checks
         if self.is_polymorphic_literal(buf_in):
             assert self.is_legal_polymorphic_fanin_literal(buf_in)
@@ -2075,7 +2082,7 @@ class PMIG:
 
     # Convert AIG to PMIG
     @staticmethod
-    def convert_aig_to_pmig(aig_obj, mig_name = None, allow_modification = False, allow_latch = True, allow_buffer = True, custom_po_conversion = None, echo_mode = 3):
+    def convert_aig_to_pmig(aig_obj, mig_name = None, allow_modification = False, allow_latch = True, allow_buffer = False, custom_po_conversion = None, echo_mode = 3):
         '''
         Convert a AIG obj to PMIG obj.
 
@@ -2137,7 +2144,7 @@ class PMIG:
         assert aig_obj._nodes[0].is_const0()
 
         # Create an PMIG obj
-        pmig_obj = PMIG(name=mig_name)
+        pmig_obj = PMIG(name=mig_name, allow_buffer_type_node=allow_buffer)
 
         # Convert _AIG_Node to _MIG_Node
         for node_i, node_n in enumerate(aig_obj._nodes):
@@ -2486,6 +2493,8 @@ class PMIG:
                 nmap.add_node_mapping(literal_i, new_l)
 
             elif self.is_buffer(literal_i):
+                if not self._allow_buffer:
+                    assert False
                 buf_in = self.get_buffer_in(literal_i)
                 new_buf_in = nmap.get_new_literal(buf_in)
                 if self.has_name(literal_i):
@@ -2524,6 +2533,145 @@ class PMIG:
                 reserved_po_list.append(po_id)
         # print(reserved_po_list)
         return self.pmig_clean_irrelevant_nodes(pos=reserved_po_list)
+
+    class _buffer_removal_map:
+        def __init__(self):
+            self._buf_literal_to_fanin = {}
+
+        def add_new(self, l_literal, l_fanin):
+            assert not PMIG.is_polymorphic_literal(l_literal)
+            assert not PMIG.is_negated_literal(l_literal)
+            assert l_literal not in self._buf_literal_to_fanin
+            self._buf_literal_to_fanin[l_literal] = l_fanin
+
+        def _get_real_fanin(self, buf_l):
+            l_original = PMIG.get_positive_normal_literal(buf_l)
+            assert l_original in self._buf_literal_to_fanin
+            l_new = self._buf_literal_to_fanin[l_original]
+            return PMIG.add_attr_if_has_attr(l_new, buf_l)
+
+        def has_literal_record(self, l):
+            l_original = PMIG.get_positive_normal_literal(l)
+            if l_original in self._buf_literal_to_fanin:
+                return True
+            else:
+                return False
+
+        def get_real_literal(self, literal):
+            if self.has_literal_record(l=literal):
+                return self._get_real_fanin(buf_l=literal)
+            else:
+                return literal
+
+
+    def pmig_clean_all_buffers(self):
+        '''
+        Return a new PMIG obj, only containing the nodes relevant to specified outputs (pos), and all of the buffer-type node
+        are removed.
+
+        :return:
+        '''
+        pos = None
+
+        nmap = PMIG.node_map()
+        buf_map = PMIG._buffer_removal_map()
+        if pos is None:
+            # print(self.n_pos())
+            pos = range(0, self.n_pos())
+        pos_set = set(pos)
+        pmig_new = PMIG()
+        relevant_literals = self.get_seq_cone(self.get_po_fanin(po_id) for po_id in pos_set)
+        # Create lists of PI and other nodes
+        pis_list = []
+        nodes_list = []
+        for literal_i in self.topological_sort(relevant_literals):
+            assert isinstance(literal_i, int)
+            assert not self.is_negated_literal(literal_i)
+            assert not self.is_polymorphic_literal(literal_i)
+
+            if self.is_const0(literal_i):
+                assert literal_i == 0
+                continue
+
+            elif self.is_pi(literal_i):
+                pis_list.append(literal_i)
+            else:
+                assert self.is_maj(literal_i) or self.is_latch(literal_i) or self.is_buffer(literal_i)
+                nodes_list.append(literal_i)
+                if self.is_buffer(literal_i):
+                    real_fanin = self.skip_buffer(b=literal_i)
+                    buf_map.add_new(l_literal=literal_i, l_fanin=real_fanin)
+
+        # Create nodes
+        for literal_i in (pis_list + nodes_list):
+
+            if self.is_pi(literal_i):
+                if self.has_name(literal_i):
+                    new_l = pmig_new.create_pi(name=self.get_name_by_id(literal_i))
+                else:
+                    new_l = pmig_new.create_pi()
+                nmap.add_node_mapping(literal_i, new_l)
+
+            elif self.is_latch(literal_i):
+                latch_init = self.get_latch_init(literal_i)
+                latch_next = self.get_latch_next(literal_i)
+                latch_init_real = buf_map.get_real_literal(literal=latch_init)
+                latch_next_real = buf_map.get_real_literal(literal=latch_next)
+                new_latch_init = nmap.get_new_literal(latch_init_real)
+                new_latch_next = nmap.get_new_literal(latch_next_real)
+                if self.has_name(literal_i):
+                    new_l = pmig_new.create_latch(name=self.get_name_by_id(literal_i), init=new_latch_init,
+                                                  next=new_latch_next)
+                else:
+                    new_l = pmig_new.create_latch(init=new_latch_init, next=new_latch_next)
+                nmap.add_node_mapping(literal_i, new_l)
+
+            elif self.is_maj(literal_i):
+                maj_ch0 = self.get_maj_child0(literal_i)
+                maj_ch1 = self.get_maj_child1(literal_i)
+                maj_ch2 = self.get_maj_child2(literal_i)
+                maj_ch0_real = buf_map.get_real_literal(literal=maj_ch0)
+                maj_ch1_real = buf_map.get_real_literal(literal=maj_ch1)
+                maj_ch2_real = buf_map.get_real_literal(literal=maj_ch2)
+                new_maj_ch0 = nmap.get_new_literal(maj_ch0_real)
+                new_maj_ch1 = nmap.get_new_literal(maj_ch1_real)
+                new_maj_ch2 = nmap.get_new_literal(maj_ch2_real)
+                # print(new_maj_ch0, new_maj_ch1, new_maj_ch2)
+                new_l = pmig_new.create_maj(child0=new_maj_ch0, child1=new_maj_ch1, child2=new_maj_ch2)
+                if self.has_name(literal_i):
+                    pmig_new.set_name(new_l, self.get_name_by_id(literal_i))
+                nmap.add_node_mapping(literal_i, new_l)
+
+            elif self.is_buffer(literal_i):
+                print("Remove buffer: {}".format(literal_i))
+                # if not self._allow_buffer:
+                #     assert False
+                # buf_in = self.get_buffer_in(literal_i)
+                # new_buf_in = nmap.get_new_literal(buf_in)
+                # if self.has_name(literal_i):
+                #     new_l = pmig_new.create_buffer(buf_in=new_buf_in, name=self.get_name_by_id(literal_i))
+                # else:
+                #     new_l = pmig_new.create_buffer(buf_in=new_buf_in)
+                # nmap.add_node_mapping(literal_i, new_l)
+
+            else:
+                assert False
+
+        # Create POs
+        for po_i in pos_set:
+            po_fanin = self.get_po_fanin(po_i)
+            po_fanin_real = buf_map.get_real_literal(literal=po_fanin)
+            po_type = self.get_po_type(po_i)
+            new_po_fanin = nmap.get_new_literal(po_fanin_real)
+
+            if self.po_has_name(po_i):
+                pmig_new.create_po(f=new_po_fanin, name=self.get_name_by_po(po_i), po_type=po_type)
+            else:
+                pmig_new.create_po(f=new_po_fanin, po_type=po_type)
+        # print(nmap._nodemap_original_to_new.items())
+        assert (pmig_new.n_buffers_all() == 0)
+        return pmig_new
+
 
 
 

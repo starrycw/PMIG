@@ -139,12 +139,17 @@ class Literal_Map:
 
 
 
-class PMIG_Generation:
+class PMIG_Generation_combinational:
+    # 注意：不允许存在buffer与latch
     def __init__(self, mig1, mig2):
         assert isinstance(mig1, PMIG)
         assert isinstance(mig2, PMIG)
         assert not self.is_polymorphic_mig(mig1), "[ERROR]graphs_polymorphic: The input PMIG (mig1) cannot be polymorphic!"
         assert not self.is_polymorphic_mig(mig2), "[ERROR]graphs_polymorphic: The input PMIG (mig2) cannot be polymorphic!"
+        assert self.is_combinational_mig(mig1)
+        assert self.is_combinational_mig(mig2)
+        assert not self.is_mig_with_buffer(mig1)
+        assert not self.is_mig_with_buffer(mig2)
         self._mig_a = mig1 # The PMIG obj of function A
         self._mig_b = mig2 # The PMIG obj of function B
         self._pmux, self._pmux_literals = self.get_pmux() # The PMIG obj of MUX, and the dict literals.
@@ -174,13 +179,39 @@ class PMIG_Generation:
             return True
         return False
 
+    def is_combinational_mig(self, mig_obj):
+        '''
+        Return True if mig_obj has no LATCH-TYPE node.
+
+
+        :param mig_obj:
+        :return:
+        '''
+        assert isinstance(mig_obj, PMIG)
+        for i in mig_obj.get_iter_latches():
+            return False
+        return True
+
+    def is_mig_with_buffer(self, mig_obj):
+        '''
+        Return True if mig_obj has BUFFER-TYPE node.
+
+        :param mig_obj:
+        :return:
+        '''
+
+        assert isinstance(mig_obj, PMIG)
+        for i in mig_obj.get_iter_buffers():
+            return True
+        return False
+
     # def get_pmux(self):
     #     '''
     #     It should be defined in sub-class!
     #
     #     :return:
     #     '''
-    #     # Assert False, "[ERROR] graphs_polymorphic: PMIG_Generation.get_pmux() should not be called! It should be defined in sub-class."
+    #     # Assert False, "[ERROR] graphs_polymorphic: PMIG_Generation_combinational.get_pmux() should not be called! It should be defined in sub-class."
     #     return PMIG(), None
 
     def print_pos_of_mig(self):
@@ -444,6 +475,7 @@ class PMIG_Generation:
                 self._conversion_map.add_new_mapping(l, new_l, subgraph)
 
             elif mig_obj.is_latch(l):
+                assert False
                 l_init = mig_obj.get_latch_init(l)
                 l_next = mig_obj.get_latch_next(l)
                 new_init = self._conversion_map.get_new_literal(l_init, subgraph)
@@ -452,6 +484,7 @@ class PMIG_Generation:
                 self._conversion_map.add_new_mapping(l, new_l, subgraph)
 
             elif mig_obj.is_buffer(l):
+                assert False
                 buf_in = mig_obj.get_buffer_in(l)
                 new_in = self._conversion_map.get_new_literal(buf_in, subgraph)
                 new_l = self._pmig_generated.create_buffer(buf_in=new_in, name=new_name)
@@ -532,6 +565,7 @@ class PMIG_Generation:
                 map_mux_to_new[l] = new_l
 
             elif self._pmux.is_latch(l):
+                assert False
                 l_init = self._pmux.get_latch_init(l)
                 l_next = self._pmux.get_latch_next(l)
                 l_init_normal = self._pmux.negate_literal_if_negated(self._pmux.polymorphic_literal_if_polyedged(l_init, l_init), l_init)
@@ -545,6 +579,7 @@ class PMIG_Generation:
                 map_mux_to_new[l] = new_l
 
             elif self._pmux.is_buffer(l):
+                assert False
                 buf_in = self._pmux.get_buffer_in(l)
                 buf_in_normal = self._pmux.negate_literal_if_negated( self._pmux.polymorphic_literal_if_polyedged(buf_in, buf_in), buf_in)
                 assert buf_in_normal in map_mux_to_new
@@ -617,6 +652,93 @@ class PMIG_Generation:
     def opti_clean_pos_by_type(self, po_type_tuple=(PMIG.PO_OBSOLETE, )):
         assert isinstance(self._pmig_generated_opti, PMIG)
         self._pmig_generated_opti = self._pmig_generated_opti.pmig_clean_pos_by_type(po_type_tuple=po_type_tuple)
+        return self._pmig_generated_opti
+
+    def op_recovergence_driven_cut_computation(self, root_l, n, stop_list = []):
+        '''
+        输入一个root_l（literal)，以及整数n，返回一个以root_l对应的node为root的n割集PMIG对象。
+        使用recovergence-driven cut computation算法。
+        注意：stop_list应当包含一些node的literal（无属性），默认为空。
+        该列表中的literal所对应的node在本方法中被视为类似于PI，即无扇入。
+        该列表的意义是：避免列表中的node被作为一个cut的leaves与root之间的中间node。
+        例如，某个node具有多个扇出，因此不希望它作为一个cut的中间node被优化掉，此时就可以借助stop_list。
+
+        :param root_id:
+        :param n:
+        :return:
+        '''
+
+        # 迭代执行，尝试将nodeset_leaves中node的扇入来替换该node作为leaves。每次被替换的node都是非stop的并且具有最低cost的，并且替换必须不能使leaves数目超过限制。
+        def construct_cut_rec( nodeset_leaves, nodeset_visited, size_limit, stop_list ):
+            def is_stop_node(l):
+                if self._pmig_generated_opti.is_pi(l):
+                    return True
+                if self._pmig_generated_opti.is_const0(l):
+                    return True
+                if l in stop_list:
+                    return True
+                return False
+
+            assert isinstance(nodeset_leaves, list)
+            assert isinstance(nodeset_visited, list)
+
+            if if_all_nodes_are_stop_nodes(leaves=nodeset_leaves, stop_list=stop_list):
+                return nodeset_leaves, nodeset_visited
+
+            min_cost = 10
+            node_with_min_cost = None
+            for n_i in ( l_nodes for l_nodes in nodeset_leaves if not is_stop_node(l=l_nodes) ):
+                cost_i = leaf_cost(node_m=n_i, visited=nodeset_visited)
+                if cost_i < min_cost:
+                    min_cost = cost_i
+                    node_with_min_cost = n_i
+            assert (min_cost<10) and (node_with_min_cost is not None)
+            if ( len(nodeset_leaves) + min_cost ) > size_limit:
+                return nodeset_leaves, nodeset_visited
+
+            for fanin_i in self._pmig_generated_opti.get_maj_fanins(node_with_min_cost):
+                if (PMIG.get_positive_normal_literal(f=fanin_i)) not in nodeset_leaves:
+                    nodeset_leaves.append(PMIG.get_positive_normal_literal(f=fanin_i))
+            assert node_with_min_cost in nodeset_leaves
+            nodeset_leaves.remove(node_with_min_cost)
+            assert node_with_min_cost not in nodeset_leaves
+
+            for fanin_i in self._pmig_generated_opti.get_maj_fanins(node_with_min_cost):
+                if (PMIG.get_positive_normal_literal(f=fanin_i)) not in nodeset_visited:
+                    nodeset_visited.append(PMIG.get_positive_normal_literal(f=fanin_i))
+
+            return construct_cut_rec(nodeset_leaves=nodeset_leaves, nodeset_visited=nodeset_visited, size_limit=size_limit, stop_list=stop_list)
+
+        # 用于检查leaves列表中的nodes是否全部都不可被扇入替代了。这作为迭代的终止条件之一。
+        def if_all_nodes_are_stop_nodes(leaves, stop_list):
+            def is_stop_node(l):
+                if self._pmig_generated_opti.is_pi(l):
+                    return True
+                if self._pmig_generated_opti.is_const0(l):
+                    return True
+                if l in stop_list:
+                    return True
+                return False
+
+            for l in leaves:
+                if not is_stop_node(l):
+                    return False
+            return True
+
+        # cost函数
+        def leaf_cost(node_m, visited):
+            cost = -1
+            # print(node_m)
+            for ch_l in self._pmig_generated_opti.get_maj_fanins(node_m):
+                if PMIG.get_positive_normal_literal(ch_l) not in visited:
+                    cost = cost + 1
+            return cost
+
+        # main
+        nodeset_leaves = [root_l]
+        nodeset_visited = [root_l]
+        stop_list = tuple(stop_list)
+        return construct_cut_rec(nodeset_leaves=nodeset_leaves, nodeset_visited=nodeset_visited, size_limit=n, stop_list=stop_list)
 
 
 
@@ -628,7 +750,9 @@ class PMIG_Generation:
 
 
 
-class PMIG_PNode(PMIG_Generation):
+
+
+class PMIG_PNode_comb(PMIG_Generation_combinational):
     def __init__(self, mig1, mig2):
         super().__init__(mig1, mig2)
         self._pmig_generated = PMIG(enable_polymorphic=(False, True)) # The PMIG generated by self.pmig_generation
@@ -655,7 +779,7 @@ class PMIG_PNode(PMIG_Generation):
         pmux.create_po(literal_abc, name="mux_PO")
         return pmux, {'fanin_A':literal_a, 'fanin_B':literal_b, 'ctl':literal_c, 'PI':None}
 
-class PMIG_PEdge(PMIG_Generation):
+class PMIG_PEdge_comb(PMIG_Generation_combinational):
     def __init__(self, mig1, mig2):
         super().__init__(mig1, mig2)
         self._pmig_generated = PMIG(enable_polymorphic=(True, False)) # The PMIG generated by self.pmig_generation
