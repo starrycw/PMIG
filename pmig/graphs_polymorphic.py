@@ -14,6 +14,9 @@ import copy
 
 
 class Literal_Map:
+    '''
+    这个类是为了在使用mux合并两个PMIG图时，存储nodes的新旧literal映射关系
+    '''
     def __init__(self):
         self._nodemap_A_to_new = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
         self._nodemap_new_to_A = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
@@ -136,7 +139,27 @@ class Literal_Map:
         else:
             assert False
 
+class Cut_Mapping:
+    '''
+    这个类是为了存储n-cut与原图之间的nodes映射关系
+    '''
+    def __init__(self):
+        self._nodes_mapping = {} # 原图中的nodes literal（无属性）：cut图中的nodes literal（无属性）
 
+    def add_nodes_mapping(self, l_old, l_new):
+        assert not PMIG.is_negated_literal(l_old)
+        assert not PMIG.is_polymorphic_literal(l_old)
+        assert not PMIG.is_negated_literal(l_new)
+        assert not PMIG.is_polymorphic_literal(l_new)
+        assert l_old not in self._nodes_mapping
+        self._nodes_mapping[l_old] = l_new
+
+    def get_new_literal(self, l_old):
+        l_old_noattr = PMIG.get_positive_normal_literal(f=l_old)
+        assert l_old_noattr in self._nodes_mapping
+        l_new_noattr = self._nodes_mapping[l_old_noattr]
+        l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_old)
+        return l_new
 
 
 class PMIG_Generation_combinational:
@@ -654,10 +677,10 @@ class PMIG_Generation_combinational:
         self._pmig_generated_opti = self._pmig_generated_opti.pmig_clean_pos_by_type(po_type_tuple=po_type_tuple)
         return self._pmig_generated_opti
 
-    def op_recovergence_driven_cut_computation(self, root_l, n, stop_list = []):
+    def op_reconvergence_driven_cut_computation(self, root_l, n, stop_list = []):
         '''
         输入一个root_l（literal)，以及整数n，返回一个以root_l对应的node为root的n割集PMIG对象。
-        使用recovergence-driven cut computation算法。
+        使用reconvergence-driven cut computation算法。
         注意：stop_list应当包含一些node的literal（无属性），默认为空。
         该列表中的literal所对应的node在本方法中被视为类似于PI，即无扇入。
         该列表的意义是：避免列表中的node被作为一个cut的leaves与root之间的中间node。
@@ -739,6 +762,65 @@ class PMIG_Generation_combinational:
         nodeset_visited = [root_l]
         stop_list = tuple(stop_list)
         return construct_cut_rec(nodeset_leaves=nodeset_leaves, nodeset_visited=nodeset_visited, size_limit=n, stop_list=stop_list)
+
+    def op_get_n_cut(self, root_l, n, stop_list=[], cut_computation_method=None):
+        '''
+        获得以root_l(literal)为root的n-cut，并将获得的cut构建一个PMIG用于优化。
+
+        :param root_l: INT - root node的literal
+        :param n: INT - leaves数目上限
+        :param stop_list: TUPLE - stop nodes， 默认为空
+        :param cut_computation_method: 获得n-cut的方法
+        :return:
+        '''
+        if cut_computation_method is None:
+            cut_computation = self.op_reconvergence_driven_cut_computation
+        # Get n-cut
+        nodeset_leaves, nodeset_visited = cut_computation(root_l=root_l, n=n, stop_list=stop_list)
+        nodeset_cone = self._pmig_generated_opti.get_cone(roots=(root_l,), stop=nodeset_leaves)
+        # checks
+        for i in nodeset_visited:
+            assert (i in nodeset_leaves) or (i in nodeset_cone)
+        for i in nodeset_cone:
+            assert i in nodeset_visited
+        for i in nodeset_leaves:
+            assert i in nodeset_visited
+        assert len(nodeset_leaves) + len(nodeset_cone) == len(nodeset_visited)
+
+        # Create PMIG
+        pmig_cut = PMIG()
+        cut_map = Cut_Mapping()
+        # PI
+        for i in nodeset_leaves:
+            if i == pmig_cut.get_literal_const0():
+                cut_map.add_nodes_mapping(l_old=i, l_new=i)
+            else:
+                new_l = pmig_cut.create_pi()
+                cut_map.add_nodes_mapping(l_old=i, l_new=new_l)
+        # MAJ
+        for i in nodeset_cone:
+            assert self._pmig_generated_opti.is_maj(f=i)
+            ch0, ch1, ch2 = self._pmig_generated_opti.get_maj_fanins(f=i)
+            ch0_new = cut_map.get_new_literal(l_old=ch0)
+            ch1_new = cut_map.get_new_literal(l_old=ch1)
+            ch2_new = cut_map.get_new_literal(l_old=ch2)
+            new_l = pmig_cut.create_maj(child0=ch0_new, child1=ch1_new, child2=ch2_new)
+            cut_map.add_nodes_mapping(l_old=i, l_new=new_l)
+
+        # Collect info
+        cut_map_po = (cut_map.get_new_literal(root_l), root_l)
+        cut_map_pi = {}
+        for i in nodeset_leaves:
+            key = cut_map.get_new_literal(l_old=i)
+            cut_map_pi[key] = i
+
+        # return
+        return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po
+
+
+
+
+
 
 
 
