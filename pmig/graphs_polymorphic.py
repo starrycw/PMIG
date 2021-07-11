@@ -817,6 +817,47 @@ class PMIG_Generation_combinational:
         # return
         return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po
 
+    def op_number_of_fanouts(self, target_l):
+        '''
+        输入一个node的literal， 返回这个node的扇出数目。
+
+        :param l:
+        :return:
+        '''
+
+        n_fanout = 0
+        target_id = target_l >> 2
+        for node_l in self._pmig_generated_opti.get_iter_nodes_all():
+            if self._pmig_generated_opti.is_maj(f=node_l):
+                for ch_l in self._pmig_generated_opti.get_maj_fanins(f=node_l):
+                    ch_id = ch_l >> 2
+                    if ch_id == target_id:
+                        n_fanout = n_fanout + 1
+            elif self._pmig_generated_opti.is_latch(f=node_l):
+                assert False
+            elif self._pmig_generated_opti.is_buffer(f=node_l):
+                assert False
+            else:
+                assert (self._pmig_generated_opti.is_pi(f=node_l) or self._pmig_generated_opti.is_const0(f=node_l))
+        return n_fanout
+
+    def op_get_all_nodes_with_multiple_fanouts(self, limit_number = 1):
+        '''
+        返回一个元组，包含扇出数目大于limit_number(默认为1)的node的literal。
+
+        :param limit_number:
+        :return:
+        '''
+        node_list = []
+        for node_l in self._pmig_generated_opti.get_iter_nodes_all():
+            if self.op_number_of_fanouts(target_l=node_l) > limit_number:
+                node_list.append(node_l)
+        node_tuple = tuple(copy.deepcopy(node_list))
+        return node_tuple
+
+
+
+
 
 
 

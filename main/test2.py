@@ -60,16 +60,23 @@ pnode_muxed.opti_clean_pos_by_type()
 mig_muxed = pnode_muxed.get_pmig_generated()
 print(mig_muxed)
 
-root = 80
-n=9
+root = 96
+n=3
+print("####################################################")
+node_with_multuple_fanout = pnode_muxed.op_get_all_nodes_with_multiple_fanouts()
+print(node_with_multuple_fanout)
+print(pnode_muxed.get_pmig_generated())
+
 print(mig_muxed.get_maj_fanins(root))
-leaves, visited = pnode_muxed.op_reconvergence_driven_cut_computation(root_l=root, n=n, stop_list=(22,))
+leaves, visited = pnode_muxed.op_reconvergence_driven_cut_computation(root_l=root, n=n, stop_list=node_with_multuple_fanout)
 print(leaves, visited)
 print(pnode_muxed.get_pmig_generated().get_cone(roots=(root, ), stop=leaves))
-cut_pmig, cut_map_pi, cut_map_po = pnode_muxed.op_get_n_cut(root_l=root, n=n, stop_list=(22, ))
+cut_pmig, cut_map_pi, cut_map_po = pnode_muxed.op_get_n_cut(root_l=root, n=n, stop_list=node_with_multuple_fanout)
 print(cut_pmig)
 print(cut_map_pi)
 print(cut_map_po)
+
+
 
 # pmig_veri1 = pmig_veri.PMIG_Verification(pmig_obj=mig_muxed)
 # pmig_veri1.print_pis_id(more_info=True)
