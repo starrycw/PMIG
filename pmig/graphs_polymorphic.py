@@ -526,9 +526,9 @@ class PMIG_Generation_combinational:
             new_type = po_type
             self._pmig_generated.create_po(f=new_fanin, name=new_name, po_type=new_type)
 
-    def _create_mux(self, fanin_a, fanin_b, obsolete_muxed_pos = False):
+    def _create_mux(self, fanin_a, fanin_b, obsolete_muxed_pos = False, ctl_mapping = 'PI', ctl_pi_literal = None):
         '''
-        注意： 若self._pmux_literals中存在‘ctl’项，那么将其映射为0/1。若不存在，则不映射。
+        注意： 若self._pmux_literals中存在‘ctl’项，那么将其映射为PI(ctl_mapping = 'PI',默认)或0/1(ctl_mapping = 'CONST')。若不存在，则不映射。
 
         :param fanin_a:
         :param fanin_b:
@@ -537,6 +537,7 @@ class PMIG_Generation_combinational:
         '''
         assert isinstance(self._pmig_generated, PMIG)
         assert isinstance(self._pmux, PMIG)
+        new_ctl_pi_literal = None
         map_mux_to_new = {self._pmux.get_literal_const0(): self._pmig_generated.get_literal_const0()}
         l_mux_a = self._pmux_literals['fanin_A']
         l_mux_b = self._pmux_literals['fanin_B']
@@ -553,7 +554,17 @@ class PMIG_Generation_combinational:
         map_mux_to_new[l_mux_a] = fanin_a
         map_mux_to_new[l_mux_b] = fanin_b
         if l_ctl is not None:
-            map_mux_to_new[l_ctl] = self._pmig_generated.get_literal_const_0_1()
+            if ctl_mapping == 'PI':
+                if ctl_pi_literal is None:
+                    new_ctl_pi_literal = self._pmig_generated.create_pi("polymorphic_ctl_pi")
+                    map_mux_to_new[l_ctl] = new_ctl_pi_literal
+                else:
+                    map_mux_to_new[l_ctl] = ctl_pi_literal
+                    new_ctl_pi_literal = ctl_pi_literal
+            elif ctl_mapping == 'CONST':
+                map_mux_to_new[l_ctl] = self._pmig_generated.get_literal_const_0_1()
+            else:
+                assert False
         # Nodes
         for l in self._pmux.get_iter_nodes_all():
             if self._pmux.is_const0(l):
@@ -635,6 +646,7 @@ class PMIG_Generation_combinational:
                     cnt_temp = cnt_temp + 1
                 # assert cnt_temp <= 2
 
+        return new_ctl_pi_literal
 
 
 
@@ -649,12 +661,14 @@ class PMIG_Generation_combinational:
         self._convert_pos_to_new(mig_obj=self._mig_a, subgraph='A')
         self._convert_pos_to_new(mig_obj=self._mig_b, subgraph='B')
         # Mux
+        ctl_pi_literal = None
         for po_id_a, po_id_b in self._mux_fanins:
             po_in_a = self._mig_a.get_po_fanin(po_id_a)
             po_in_b = self._mig_b.get_po_fanin(po_id_b)
             new_po_in_a = self._conversion_map.get_new_literal(literal_original=po_in_a, subgraph='A')
             new_po_in_b = self._conversion_map.get_new_literal(literal_original=po_in_b, subgraph='B')
-            self._create_mux(fanin_a=new_po_in_a, fanin_b=new_po_in_b, obsolete_muxed_pos=obsolete_muxed_pos)
+            new_ctl_pi_literal = self._create_mux(fanin_a=new_po_in_a, fanin_b=new_po_in_b, obsolete_muxed_pos=obsolete_muxed_pos, ctl_mapping='PI', ctl_pi_literal=ctl_pi_literal)
+            ctl_pi_literal = new_ctl_pi_literal
 
         # Copy to self._pmig_generated_opti
         self._pmig_generated_opti = copy.deepcopy(self._pmig_generated)
@@ -716,7 +730,7 @@ class PMIG_Generation_combinational:
                     min_cost = cost_i
                     node_with_min_cost = n_i
             assert (min_cost<10) and (node_with_min_cost is not None)
-            if ( len(nodeset_leaves) + min_cost ) > size_limit:
+            if ( len(nodeset_leaves) + min_cost ) > (size_limit + 1):  #  size_limit+1是由于考虑到存在一个CONST0
                 return nodeset_leaves, nodeset_visited
 
             for fanin_i in self._pmig_generated_opti.get_maj_fanins(node_with_min_cost):
@@ -758,7 +772,7 @@ class PMIG_Generation_combinational:
             return cost
 
         # main
-        nodeset_leaves = [root_l]
+        nodeset_leaves = [root_l, PMIG.get_literal_const0()]
         nodeset_visited = [root_l]
         stop_list = tuple(stop_list)
         return construct_cut_rec(nodeset_leaves=nodeset_leaves, nodeset_visited=nodeset_visited, size_limit=n, stop_list=stop_list)
@@ -788,7 +802,7 @@ class PMIG_Generation_combinational:
         assert len(nodeset_leaves) + len(nodeset_cone) == len(nodeset_visited)
 
         # Create PMIG
-        pmig_cut = PMIG()
+        pmig_cut = PMIG(enable_polymorphic=(self._pmig_generated_opti.attribute_polymorphic_edges_flag_get(), self._pmig_generated_opti.attribute_polymorphic_nodes_flag_get()), allow_buffer_type_node=False)
         cut_map = Cut_Mapping()
         # PI
         for i in nodeset_leaves:
@@ -806,6 +820,9 @@ class PMIG_Generation_combinational:
             ch2_new = cut_map.get_new_literal(l_old=ch2)
             new_l = pmig_cut.create_maj(child0=ch0_new, child1=ch1_new, child2=ch2_new)
             cut_map.add_nodes_mapping(l_old=i, l_new=new_l)
+
+        # PO
+        pmig_cut.create_po(f=cut_map.get_new_literal(root_l))
 
         # Collect info
         cut_map_po = (cut_map.get_new_literal(root_l), root_l)
@@ -859,31 +876,15 @@ class PMIG_Generation_combinational:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class PMIG_PNode_comb(PMIG_Generation_combinational):
     def __init__(self, mig1, mig2):
         super().__init__(mig1, mig2)
-        self._pmig_generated = PMIG(enable_polymorphic=(False, True)) # The PMIG generated by self.pmig_generation
-        self._pmig_generated_opti = PMIG(enable_polymorphic=(False, True)) # The PMIG generated by self.pmig_generation and optimized by self.opti_* functions.
+        self._pmig_generated = PMIG(enable_polymorphic=(False, False)) # The PMIG generated by self.pmig_generation
+        self._pmig_generated_opti = PMIG(enable_polymorphic=(False, False)) # The PMIG generated by self.pmig_generation and optimized by self.opti_* functions.
 
     def reset_pmig(self):
-        self._pmig_generated = PMIG(enable_polymorphic=(False, True))
-        self._pmig_generated_opti = PMIG(enable_polymorphic=(False, True))
+        self._pmig_generated = PMIG(enable_polymorphic=(False, False))
+        self._pmig_generated_opti = PMIG(enable_polymorphic=(False, False))
 
 
     def get_pmux(self):

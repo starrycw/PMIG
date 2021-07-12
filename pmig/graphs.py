@@ -539,6 +539,7 @@ class PMIG:
         :param n:
         :return:
         '''
+        # print("@@@", n, len(self._nodes))
         assert 0 <= n < len(self._nodes)
         return self._nodes[n]
 
@@ -2438,7 +2439,7 @@ class PMIG:
             # print(self.n_pos())
             pos = range(0, self.n_pos())
         pos_set = set(pos)
-        pmig_new = PMIG()
+        pmig_new = PMIG(enable_polymorphic=self._polymorphic_flags, allow_buffer_type_node=self._allow_buffer)
         relevant_literals = self.get_seq_cone(self.get_po_fanin(po_id) for po_id in pos_set)
         # Create lists of PI and other nodes
         pis_list = []
@@ -2579,7 +2580,7 @@ class PMIG:
             # print(self.n_pos())
             pos = range(0, self.n_pos())
         pos_set = set(pos)
-        pmig_new = PMIG()
+        pmig_new = PMIG(enable_polymorphic=self._polymorphic_flags)
         relevant_literals = self.get_seq_cone(self.get_po_fanin(po_id) for po_id in pos_set)
         # Create lists of PI and other nodes
         pis_list = []

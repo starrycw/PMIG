@@ -667,6 +667,64 @@ class PMIG_Verification:
             #    nvalue_by_pi_vec则是整理后的PO的逻辑值，它是一个元组，每一个元素都代表了一种输入向量下的PO值，是一个包含各个PO逻辑值的元组
             return ( simu_info_pis, simu_info_latches, simu_info_pos ), result_list, nvalue_by_pi_vec
 
+    def simu_auto_for_exact_synthesis(self):
+        self.reset_all()
+
+        result_mixed = []
+        pi_len = len(self._pis_id)
+        assert len(self._latches_id) == 0
+
+        vec_max = pow(2, pi_len)
+        for vec_value in range(0, vec_max):
+            vec_bin = bin(vec_value)[2:]
+            vec_tuple = tuple(str.zfill(vec_bin, pi_len))
+            # print(len(vec_tuple), pi_len, latch_len)
+            assert len(vec_tuple) == pi_len
+            vec_pi_tuple = vec_tuple[:pi_len]
+            pi_vec = []
+            for i in vec_pi_tuple:
+                if int(i) == 0:
+                    pi_vec.append(NVALUE_0)
+                elif int(i) == 1:
+                    pi_vec.append(NVALUE_1)
+                else:
+                    assert False
+
+            assert len(self.return_pmig_pos_list()) == 1
+            result_pos_value, pos_selected, pi_vec = self.simu_pos_value(pi_vec=pi_vec, latch_vec=[], allow_node_with_fixed_value=False)
+
+            assert len(result_pos_value) == 1
+            result_mixed.append(result_pos_value[0][0])
+
+        # 分别将两种模式下的结果记录在两个列表中
+        result_f1 = []
+        result_f2 = []
+        if_polymorphic = False
+        for mixed_value in result_mixed:
+            if mixed_value == NVALUE_0:
+                result_f1.append(0)
+                result_f2.append(0)
+            elif mixed_value == NVALUE_1:
+                result_f1.append(1)
+                result_f2.append(1)
+            elif mixed_value == NVALUE_P01:
+                result_f1.append(0)
+                result_f2.append(1)
+                if_polymorphic = True
+            elif mixed_value == NVALUE_P10:
+                result_f1.append(1)
+                result_f2.append(0)
+                if_polymorphic = True
+            else:
+                print(mixed_value)
+                assert False
+
+        return tuple(copy.deepcopy(result_f1)), tuple(copy.deepcopy(result_f2)), if_polymorphic
+
+
+
+
+
 
 
 
