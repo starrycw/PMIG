@@ -98,7 +98,7 @@ print(cut_map_po)
 print("######################################################")
 es1 = exact_synthesis.ExactSynthesis_4Cut(cut_pmig)
 es1._update_po_value()
-print(es1._po_value_1, es1._po_value_2, es1._is_polymorphic)
+print(es1.get_po_value())
 
 
 

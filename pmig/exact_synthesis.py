@@ -12,6 +12,26 @@ from pmig import pmig_verification
 
 from prettytable import PrettyTable
 import copy
+import numpy
+
+
+class Z3Solver_PMIG:
+    def __init__(self, po_v_1, po_v_2, n_node):
+        self._po_value_1 = copy.deepcopy(po_v_1)
+        self._po_value_2 = copy.deepcopy(po_v_2)
+        self._n_node = n_node
+        n_pis_f = numpy.log2(len(po_v_1))
+        assert n_pis_f == numpy.log2(len(po_v_2))
+        if n_pis_f % 1 == 0:
+            self._n_pis = int(n_pis_f)
+        else:
+            assert False
+
+        self._solver_main = z3.Solver()
+
+
+
+
 
 class ExactSynthesis_Base:
     def __init__(self, mig_obj):
@@ -41,6 +61,15 @@ class ExactSynthesis_Base:
         '''
         pmig_v = pmig_verification.PMIG_Verification(pmig_obj=copy.deepcopy(self._mig_original))
         self._po_value_1, self._po_value_2, self._is_polymorphic = pmig_v.simu_auto_for_exact_synthesis()
+
+    def get_po_value(self):
+        return self._po_value_1, self._po_value_2, self._is_polymorphic
+
+
+
+
+
+
 
 
 

@@ -668,6 +668,16 @@ class PMIG_Verification:
             return ( simu_info_pis, simu_info_latches, simu_info_pos ), result_list, nvalue_by_pi_vec
 
     def simu_auto_for_exact_synthesis(self):
+        '''
+        仿真一个单PO、无latch、无buffer的PMIG图的逻辑功能，用于exact synthesis。
+
+        返回值包括：
+        (1) 一个元组，元素依次为PI从全0到全1时PO在模式1下的输出逻辑值。逻辑值仅有0和1两种情况。
+        (2) 一个元组，元素依次为PI从全0到全1时PO在模式2下的输出逻辑值。逻辑值仅有0和1两种情况。
+        (3) Bool， 若上面两个元组相等，意味着该图的PO在两种模式下功能相同，可认为非多态，此时为False。繁反之为True。
+
+        :return: TUPLE, TUPLE, BOOL
+        '''
         self.reset_all()
 
         result_mixed = []
