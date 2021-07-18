@@ -691,7 +691,63 @@ class PMIG_Generation_combinational:
         self._pmig_generated_opti = self._pmig_generated_opti.pmig_clean_pos_by_type(po_type_tuple=po_type_tuple)
         return self._pmig_generated_opti
 
-    def op_reconvergence_driven_cut_computation(self, root_l, n, stop_list = []):
+    def _op_reconvergence_driven_cut_computation(self, root_l, n, stop_list_with_fanout_literals = []):
+
+        def check_inner_nodes(nodeset_leaves, nodeset_visited, nlist):
+            if_satisfied = True
+            return_literals = []
+            worst_literal = None
+            worst_n = 0
+            # 获得leaves中最大的literal
+            leaves_max = 0
+            for leaves_i in nodeset_leaves:
+                if leaves_i > leaves_max:
+                    leaves_max = leaves_i
+            # 若一个node的扇出不在visited中，并且literal大于最大的leaves literal， 那么应当加入stop_list
+            # 同时，会记录worst node（即不在visited中的fanout的数目最多的node），作为备选。
+            for mfn in nlist:
+                n = 0
+                mfn_l = mfn[0]
+                mfn_llist = mfn[1]
+                if ( (mfn_l in nodeset_visited) and (mfn_l not in nodeset_leaves) ):
+                    for mfn_llist_i in mfn_llist:
+                        if mfn_llist_i not in nodeset_visited:
+                            if_satisfied = False
+                            n = n + 1
+                            if ( (mfn_llist_i > leaves_max) and (mfn_l not in return_literals) ):
+                                return_literals.append(mfn_l)
+                if n > worst_n:
+                    worst_literal = mfn_l
+
+            if (not if_satisfied) and (len(return_literals) == 0):
+                return_literals.append(worst_literal)
+
+            return if_satisfied, return_literals
+
+        # 将不可包含的点加入stop_list，这些点至少有一个扇出到的node具有比root大的literal
+        stop_list_current = []
+        for mfn in stop_list_with_fanout_literals:
+            i = 0
+            mfn_l = mfn[0]
+            mfn_llist = mfn[1]
+            for ll in mfn_llist:
+                if ll > root_l:
+                    i = i+1
+            if i > 0:
+                stop_list_current.append( mfn_l )
+
+        if_satisfied = False
+        while (not if_satisfied):
+            nodeset_leaves, nodeset_visited = self.op_reconvergence_driven_cut_computation_with_stop_list(root_l=root_l, n=n, stop_list=stop_list_current)
+            if_satisfied, additional_stop_nodes = check_inner_nodes(nodeset_leaves=nodeset_leaves, nodeset_visited=nodeset_visited,
+                              nlist=stop_list_with_fanout_literals)
+            for l_i in additional_stop_nodes:
+                stop_list_current.append(l_i)
+
+        return nodeset_leaves, nodeset_visited
+
+
+    def op_reconvergence_driven_cut_computation_with_stop_list(self, root_l, n, stop_list = []):
         '''
         输入一个root_l（literal)，以及整数n，返回一个以root_l对应的node为root的n割集PMIG对象。
         使用reconvergence-driven cut computation算法。
@@ -777,20 +833,18 @@ class PMIG_Generation_combinational:
         stop_list = tuple(stop_list)
         return construct_cut_rec(nodeset_leaves=nodeset_leaves, nodeset_visited=nodeset_visited, size_limit=n, stop_list=stop_list)
 
-    def op_get_n_cut(self, root_l, n, stop_list=[], cut_computation_method=None):
+    def op_get_n_cut_with_multifanout_checks(self, root_l, n):
         '''
         获得以root_l(literal)为root的n-cut，并将获得的cut构建一个PMIG用于优化。
 
         :param root_l: INT - root node的literal
         :param n: INT - leaves数目上限
-        :param stop_list: TUPLE - stop nodes， 默认为空
-        :param cut_computation_method: 获得n-cut的方法
         :return:
         '''
-        if cut_computation_method is None:
-            cut_computation = self.op_reconvergence_driven_cut_computation
+        cut_computation = self._op_reconvergence_driven_cut_computation
+        stop_list = self.op_get_all_nodes_with_multiple_fanouts()
         # Get n-cut
-        nodeset_leaves, nodeset_visited = cut_computation(root_l=root_l, n=n, stop_list=stop_list)
+        nodeset_leaves, nodeset_visited = cut_computation(root_l=root_l, n=n, stop_list_with_fanout_literals=stop_list)
         nodeset_cone = self._pmig_generated_opti.get_cone(roots=(root_l,), stop=nodeset_leaves)
         # checks
         for i in nodeset_visited:
@@ -832,17 +886,75 @@ class PMIG_Generation_combinational:
             cut_map_pi[key] = i
 
         # return
-        return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po
+        return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited
+
+    # def op_get_n_cut(self, root_l, n, stop_list=[], cut_computation_method=None):
+    #     '''
+    #     获得以root_l(literal)为root的n-cut，并将获得的cut构建一个PMIG用于优化。
+    #
+    #     :param root_l: INT - root node的literal
+    #     :param n: INT - leaves数目上限
+    #     :param stop_list: TUPLE - stop nodes， 默认为空
+    #     :param cut_computation_method: 获得n-cut的方法
+    #     :return:
+    #     '''
+    #     if cut_computation_method is None:
+    #         cut_computation = self.op_reconvergence_driven_cut_computation
+    #     # Get n-cut
+    #     nodeset_leaves, nodeset_visited = cut_computation(root_l=root_l, n=n, stop_list_with_fanout_literals=stop_list)
+    #     nodeset_cone = self._pmig_generated_opti.get_cone(roots=(root_l,), stop=nodeset_leaves)
+    #     # checks
+    #     for i in nodeset_visited:
+    #         assert (i in nodeset_leaves) or (i in nodeset_cone)
+    #     for i in nodeset_cone:
+    #         assert i in nodeset_visited
+    #     for i in nodeset_leaves:
+    #         assert i in nodeset_visited
+    #     assert len(nodeset_leaves) + len(nodeset_cone) == len(nodeset_visited)
+    #
+    #     # Create PMIG
+    #     pmig_cut = PMIG(enable_polymorphic=(self._pmig_generated_opti.attribute_polymorphic_edges_flag_get(), self._pmig_generated_opti.attribute_polymorphic_nodes_flag_get()), allow_buffer_type_node=False)
+    #     cut_map = Cut_Mapping()
+    #     # PI
+    #     for i in nodeset_leaves:
+    #         if i == pmig_cut.get_literal_const0():
+    #             cut_map.add_nodes_mapping(l_old=i, l_new=i)
+    #         else:
+    #             new_l = pmig_cut.create_pi()
+    #             cut_map.add_nodes_mapping(l_old=i, l_new=new_l)
+    #     # MAJ
+    #     for i in nodeset_cone:
+    #         assert self._pmig_generated_opti.is_maj(f=i)
+    #         ch0, ch1, ch2 = self._pmig_generated_opti.get_maj_fanins(f=i)
+    #         ch0_new = cut_map.get_new_literal(l_old=ch0)
+    #         ch1_new = cut_map.get_new_literal(l_old=ch1)
+    #         ch2_new = cut_map.get_new_literal(l_old=ch2)
+    #         new_l = pmig_cut.create_maj(child0=ch0_new, child1=ch1_new, child2=ch2_new)
+    #         cut_map.add_nodes_mapping(l_old=i, l_new=new_l)
+    #
+    #     # PO
+    #     pmig_cut.create_po(f=cut_map.get_new_literal(root_l))
+    #
+    #     # Collect info
+    #     cut_map_po = (cut_map.get_new_literal(root_l), root_l)
+    #     cut_map_pi = {}
+    #     for i in nodeset_leaves:
+    #         key = cut_map.get_new_literal(l_old=i)
+    #         cut_map_pi[key] = i
+    #
+    #     # return
+    #     return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po
 
     def op_number_of_fanouts(self, target_l):
         '''
-        输入一个node的literal， 返回这个node的扇出数目。
+        输入一个node的literal， 返回这个node的扇出数目, 以及扇出到的node的literals列表。
 
         :param l:
         :return:
         '''
 
         n_fanout = 0
+        fanout_list = []
         target_id = target_l >> 2
         for node_l in self._pmig_generated_opti.get_iter_nodes_all():
             if self._pmig_generated_opti.is_maj(f=node_l):
@@ -850,25 +962,28 @@ class PMIG_Generation_combinational:
                     ch_id = ch_l >> 2
                     if ch_id == target_id:
                         n_fanout = n_fanout + 1
+                        if node_l not in fanout_list:
+                            fanout_list.append(node_l)
             elif self._pmig_generated_opti.is_latch(f=node_l):
                 assert False
             elif self._pmig_generated_opti.is_buffer(f=node_l):
                 assert False
             else:
                 assert (self._pmig_generated_opti.is_pi(f=node_l) or self._pmig_generated_opti.is_const0(f=node_l))
-        return n_fanout
+        return n_fanout, fanout_list
 
     def op_get_all_nodes_with_multiple_fanouts(self, limit_number = 1):
         '''
-        返回一个元组，包含扇出数目大于limit_number(默认为1)的node的literal。
+        返回一个元组，包含扇出数目大于limit_number(默认为1)的node的literal及扇出literals。
 
         :param limit_number:
         :return:
         '''
         node_list = []
         for node_l in self._pmig_generated_opti.get_iter_nodes_all():
-            if self.op_number_of_fanouts(target_l=node_l) > limit_number:
-                node_list.append(node_l)
+            n, ls = self.op_number_of_fanouts(target_l=node_l)
+            if n > limit_number:
+                node_list.append( (node_l, ls) )
         node_tuple = tuple(copy.deepcopy(node_list))
         return node_tuple
 

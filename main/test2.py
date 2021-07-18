@@ -52,6 +52,8 @@ print(mig_2)
 
 print("##########ccc")
 pnode_muxed = graphs_polymorphic.PMIG_PEdge_comb(mig1=mig_1, mig2=mig_2)
+pnode_muxed.print_pis_of_mig()
+pnode_muxed.print_pos_of_mig()
 pnode_muxed.set_mux_auto()
 pnode_muxed.set_merged_pis_auto()
 pnode_muxed.pmig_generation(obsolete_muxed_pos=True)
@@ -83,18 +85,18 @@ n=4
 print("####################################################")
 node_with_multuple_fanout = pnode_muxed.op_get_all_nodes_with_multiple_fanouts()
 print(node_with_multuple_fanout)
-node_with_multuple_fanout = []
+
 
 print(pnode_muxed.get_pmig_generated())
 
-print(mig_muxed.get_maj_fanins(root))
-leaves, visited = pnode_muxed.op_reconvergence_driven_cut_computation(root_l=root, n=n, stop_list=node_with_multuple_fanout)
-print(leaves, visited)
-print(pnode_muxed.get_pmig_generated().get_cone(roots=(root, ), stop=leaves))
-cut_pmig, cut_map_pi, cut_map_po = pnode_muxed.op_get_n_cut(root_l=root, n=n, stop_list=node_with_multuple_fanout)
+
+
+cut_pmig, cut_map_pi, cut_map_po, leaves, visited = pnode_muxed.op_get_n_cut_with_multifanout_checks(root_l=root, n=n)
 print(cut_pmig)
 print(cut_map_pi)
 print(cut_map_po)
+print(leaves)
+print(visited)
 print("######################################################")
 es1 = exact_synthesis.ExactSynthesis_4Cut(cut_pmig)
 es1._update_po_value()

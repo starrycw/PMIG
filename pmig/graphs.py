@@ -1486,8 +1486,11 @@ class PMIG:
         return fn
 
     def create_maj(self, child0, child1, child2):
+        return self.create_maj_with_additional_checks(child0=child0, child1=child1, child2=child2)
+
+    def create_maj_without_additional_checks(self, child0, child1, child2):
         '''
-        WARNING: Use get_maj_with_additional_checks instead of this function if you want to get a literal representing MAJ(child0, child1, child2)!
+        WARNING: Use create_maj_with_additional_checks instead of this function if you want to get a literal representing MAJ(child0, child1, child2)!
 
         Create a MAJ-type node.
         It should be noted that:
@@ -1551,7 +1554,7 @@ class PMIG:
 
         return fn
 
-    def get_maj_with_additional_checks(self, child0, child1, child2):
+    def create_maj_with_additional_checks(self, child0, child1, child2):
         '''
         Return the literal of Y = MAJ(child0, child1, child2).
         If MAJ(child0, child1, child2) can be implemented by an existing node with additional 'negated' and 'polymorphic' attributes, then return the corresponding literal.
@@ -1600,7 +1603,7 @@ class PMIG:
         if self.attribute_strash_if_exist(key_negated_polyed):
             return self.polymorphic_literal_if( self.negate_literal_if(self.attribute_strash_get(key_negated_polyed), True), True )
 
-        return self.create_maj(child0, child1, child2)
+        return self.create_maj_without_additional_checks(child0, child1, child2)
 
 
 
