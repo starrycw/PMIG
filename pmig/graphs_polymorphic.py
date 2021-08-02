@@ -718,6 +718,7 @@ class PMIG_Generation_combinational:
                                 return_literals.append(mfn_l)
                 if n > worst_n:
                     worst_literal = mfn_l
+                    worst_n = n
 
             if (not if_satisfied) and (len(return_literals) == 0):
                 return_literals.append(worst_literal)
