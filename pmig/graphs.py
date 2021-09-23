@@ -19,6 +19,7 @@ import itertools
 #
 # Nodes in MIG
 #
+#
 # 2021/09: 不再支持Buffer
 ########################################################################################################################
 class _MIG_Node:
@@ -367,7 +368,23 @@ class _MIG_Node:
 # 注意：这里所谓的“多态属性”是指“保持模式1的逻辑值不变，将模式2的逻辑值取反”。如果一个node的逻辑值为a/b，那么附加一个多态属性后，逻辑值为a/b'。
 #
 #
-# 2021/09: 不再支持Buffer。删除了部分从AIG继承的属性（比如PO_JUSTICE）。优化了对多态属性的限制（启用self._polymorphic_type）。
+# 2021/09 大更新:
+#
+#       不再兼容buffer node。现在禁止将包含buffer node的AIG转换为MIG。
+#
+#       删除了部分从AIG继承的属性（比如PO_JUSTICE），在默认参数下，未定义的PO type将被转换为未定义类型。
+#
+#       更改了对多态属性的限制。现在通过self._polymorphic_type来限制node（这里仅包括MAJ和Latch和PO）的创建：
+#           PTYPE_ALL - 允许新建以多态literal作为扇入的node;
+#           PTYPE_NO - 禁止新建以多态literal作为扇入的node;
+#           PTYPE_PIS_ONLY - 若新建的node以多态literal作为扇入，那么该多态literal只允许是多态PI（注意：这里PI仅指0,即只能为const 1/0或0/1）。
+#           is_legal_fanin_literal方法能够判断一个literal能否作为扇入。
+#
+#       改名：包括很多方法的名字，以及一些变量的名字。注意，以前版本中的“多态node”和“多态edge”的概念被废弃。
+#           多态literal扇入包括多态PI扇入（仅指const 0/1和1/0,不包括其它PI），也包括其它的多态literal扇入。
+#           is_node_with_polymorphic_edge方法判断node是否存在多态literal扇入。
+#           is_node_with_polymorphic_edge方法判断node是否存在多态PI扇入。
+#
 ########################################################################################################################
 class PMIG:
 
@@ -382,7 +399,8 @@ class PMIG:
     PO_UNDEFINED = 1
     PO_OBSOLETE = -1
 
-    # polymorphic_type (no：不允许多态；all：允许多态；pis_only：仅允许PI的扇出边具有多态属性。)
+    # polymorphic_type (no：不允许多态；all：允许多态；pis_only：仅允许const 0/1和const 1/0。)
+    # 注意此PI并非指真正的PI nodes，而是指const 0（即多态PI仅包括const 0/1和1/0） ！
     PTYPE_ALL = 0
     PTYPE_NO = 1
     PTYPE_PIS_ONLY = 2
@@ -1707,7 +1725,7 @@ class PMIG:
 
 ####### Convert AIG to PMIG
     @staticmethod
-    def convert_aig_to_pmig(aig_obj, mig_name = None, allow_latch = True, custom_po_conversion = None, echo_mode = 3):
+    def convert_aig_to_pmig(aig_obj, mig_name = None, allow_latch = True, custom_po_conversion = None, ptype_of_created_pmig = PTYPE_NO, echo_mode = 3):
         '''
         Convert a AIG obj to PMIG obj.
 
@@ -1721,13 +1739,14 @@ class PMIG:
 
         -- DICT - Dict ALLOWED_AIG_PO_TYPE specify how the PO type is mapped from AIG to PMIG. It must contain {"undefined": PMIG.PO_UNDEFINED} in order to map undefined PO types.
                   Example: {graphs.AIG.OUTPUT: graphs.PMIG.PO_OUTPUT, "undefined": graphs.PMIG.PO_UNDEFINED, graphs.AIG.JUSTICE: graphs.PMIG.PO_JUSTICE}
-
+is_legal_fanin_literal
         -- None(Default) - Dict ALLOWED_AIG_PO_TYPE is set to default
 
         :param aig_obj: AIG obj
         :param mig_name: STRING - MIG name
         :param allow_latch: Bool
         :param custom_po_conversion: None(Default) or DICT
+        :param ptype_of_created_pmig: INT - PTYPE_xxx，默认为PTYPE_NO
         :param echo_mode: INT
         :return: PMIG obj
         '''
@@ -1751,7 +1770,7 @@ class PMIG:
         assert aig_obj._nodes[0].is_const0()
 
         # Create an PMIG obj
-        pmig_obj = PMIG(name=mig_name)
+        pmig_obj = PMIG(name=mig_name, polymorphic_type=ptype_of_created_pmig)
 
         # Convert _AIG_Node to _MIG_Node
         for node_i, node_n in enumerate(aig_obj._nodes):
