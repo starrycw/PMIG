@@ -4,7 +4,9 @@
 多态MIG
 
 #### 环境需求
-Linux & Python 3.9
+- Linux 
+- Python 3.9
+  - Packages: prettytable, z3-solver
 
 #### 安装教程
 - 1\.  下载本仓库并解压。

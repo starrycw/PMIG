@@ -788,8 +788,8 @@ class PMIG:
         :return: Bool
         '''
         assert isinstance(mig_n, _MIG_Node)
-        if not ( mig_n._type in (_MIG_Node.MAJ, _MIG_Node.LATCH) ):
-            return False
+        # if not ( mig_n._type in (_MIG_Node.MAJ, _MIG_Node.LATCH) ):
+        #     return False
         if mig_n._type == _MIG_Node.MAJ:
             if self.is_polymorphic_literal( mig_n.get_maj_child0() ):
                 return True
