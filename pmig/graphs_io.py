@@ -6,7 +6,7 @@
 #
 #
 #
-
+import copy
 import io
 import re
 import subprocess
@@ -33,16 +33,16 @@ PMIG = graphs.PMIG # alias
 class pmig_writer:
     def __init__(self, pmig_obj):
         assert isinstance(pmig_obj, PMIG)
-        assert pmig_obj.n_buffers() == 0, "[ERROR] graph_io/pmig_writer: The input PMIG has buffer-type node."
+        # assert pmig_obj.n_buffers() == 0, "[ERROR] graph_io/pmig_writer: The input PMIG has buffer-type node."
 
-        self._pmig_obj = pmig_obj
-        self._N = pmig_obj.n_nodes()
-        self._I = pmig_obj.n_pis()
-        self._L = pmig_obj.n_latches()
-        self._O = pmig_obj.n_pos()
-        self._M = pmig_obj.n_majs()
+        self._pmig_obj = copy.deepcopy(pmig_obj)
+        self._N = self._pmig_obj.n_nodes()
+        self._I = self._pmig_obj.n_pis()
+        self._L = self._pmig_obj.n_latches()
+        self._O = self._pmig_obj.n_pos()
+        self._M = self._pmig_obj.n_majs()
 
-        self._comments = None  # 'None' or 'Tuple with str'
+        self._comments = None  # 'None' or 'Tuple consists of str'
         self._echomode = 3
 
         assert self._N == self._I + self._L + self._M + 1 # Const0
@@ -150,14 +150,15 @@ class pmig_writer:
             self.write_comments(f)
 
 class pmig_reader:
-    def __init__(self):
+    def __init__(self, ptype_of_pmig = PMIG.PTYPE_ALL):
         self._N = 0
         self._I = 0
         self._L = 0
         self._O = 0
         self._M = 0
 
-        self._pmig_obj = graphs.PMIG()
+        self._ptype_of_pmig = ptype_of_pmig
+        self._pmig_obj = graphs.PMIG(polymorphic_type=self._ptype_of_pmig)
         self._pmig_tasks = {}
         self._pmig_tasks_po = []
         self._echomode = 3
@@ -168,16 +169,17 @@ class pmig_reader:
         assert isinstance(file_path, str)
         cnt_line = 0
         current_po_id = 0
-        self._pmig_obj = graphs.PMIG()
+        self._pmig_obj = graphs.PMIG(polymorphic_type=self._ptype_of_pmig)
         self._pmig_tasks = {}
         self._pmig_tasks_po = []
         self._pmig_task_names = []
         self._pmig_task_ponames = []
 
-        current_line = 'data'
+        # current_line = 'data'
         for line in fileinput.input(file_path):
             if line[0] == '#':
                 continue
+
             cnt_line = cnt_line + 1
 
             if cnt_line == 1:
@@ -271,22 +273,25 @@ class pmig_reader:
                     self._pmig_task_ponames.append( (current_po_id, line_list[2]) )
                 current_po_id = current_po_id + 1
 
-            elif line[0] == '+':
-                if line[2] == 'n' and line[3] == 'n':
-                    current_line = 'node name'
-                elif line[2] == 'o' and line[3] == 'n':
-                    current_line = 'output name'
-                else:
-                    assert False, "Undefined '+ ...' line."
+            # elif line[0] == '+':
+            #     if line[2] == 'n' and line[3] == 'n':
+            #         current_line = 'node name'
+            #     elif line[2] == 'o' and line[3] == 'n':
+            #         current_line = 'output name'
+            #     else:
+            #         assert False, "Undefined '+ ...' line."
 
             else:
-                if current_line == 'node name':
-                    # self.read_nodename(line)
-                    self._pmig_task_names.append(line.rstrip('\n'))
-                elif current_line == 'output name':
-                    # self.read_poname(line)
-                    self._pmig_task_ponames.append(line.rstrip('\n'))
+                line_strip = line.strip()
+                assert len(line_strip) == 0
+                # if current_line == 'node name':
+                #     # self.read_nodename(line)
+                #     self._pmig_task_names.append(line.rstrip('\n'))
+                # elif current_line == 'output name':
+                #     # self.read_poname(line)
+                #     self._pmig_task_ponames.append(line.rstrip('\n'))
 
+        assert len(self._pmig_tasks) == self._N
         for idx in range(1, self._N):
             task = self._pmig_tasks[idx]
             task_type = task[0]
@@ -297,21 +302,28 @@ class pmig_reader:
                 assert self._pmig_obj.deref(idx << 2).is_pi()
 
 
-            if task_type == 'latch':
+            elif task_type == 'latch':
                 self._pmig_obj.create_latch(init=task[1], next=task[2])
                 if self._echomode > 1:
                     print("[INFO] graph_io/pmig_reader: Create LATCH: ", task)
                 assert self._pmig_obj.deref(idx << 2).is_latch()
 
 
-            if task_type == 'maj':
+            elif task_type == 'maj':
                 self._pmig_obj.create_maj(task[1], task[2], task[3])
                 if self._echomode > 1:
                     print("[INFO] graph_io/pmig_reader: Create MAJ: ", task)
                 assert self._pmig_obj.deref(idx << 2).is_maj()
 
+            else:
+                assert False
+
+
             assert self._pmig_obj.n_nodes() == idx + 1
 
+
+
+        assert len(self._pmig_tasks_po) == self._O
         for task in self._pmig_tasks_po:
             self._pmig_obj.create_po(f=task[0], po_type=task[1])
             if self._echomode > 1:
