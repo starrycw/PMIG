@@ -130,6 +130,9 @@ class _Base_PMIG_Gen_Comb_2to1:
         self._pmig_generated = None
         self._pmig_generated_modified = None
 
+        self._log_PO_id_map = None
+        self._log_Literal_map = None
+
     def initialization(self, mig1, mig2):
         assert False
 
@@ -543,7 +546,16 @@ class _Base_PMIG_Gen_Comb_2to1:
         self._pmig_generated_modified = copy.deepcopy(pmig_new)
         self._pmig_generated_modified = self._pmig_generated_modified.pmig_clean_pos_by_type(po_type_tuple=(graphs.PMIG.PO_OBSOLETE,))
 
+        # Save logs
+        self._log_PO_id_map = (copy.deepcopy(Dict_APO_id_map), copy.deepcopy(Dict_BPO_id_map))
+        self._log_Literal_map = copy.deepcopy(LMap)
 
+
+    def get_generated_pmig(self):
+        return copy.deepcopy(self._pmig_generated)
+
+    def get_generated_pmig_modified(self):
+        return copy.deepcopy(self._pmig_generated_modified)
 
 
 
@@ -568,6 +580,9 @@ class PMIG_Gen_Comb_2to1_PEdge(_Base_PMIG_Gen_Comb_2to1):
         self._muxed_pos_list = []
         self._pmig_generated = PMIG(polymorphic_type=self._ptype)
         self._pmig_generated_modified = PMIG(polymorphic_type=self._ptype)
+
+        self._log_PO_id_map = None
+        self._log_Literal_map = None
 
     def get_pmux(self):
         '''
@@ -619,6 +634,9 @@ class PMIG_Gen_Comb_2to1_PNode(_Base_PMIG_Gen_Comb_2to1):
         self._muxed_pos_list = []
         self._pmig_generated = PMIG(polymorphic_type=self._ptype)
         self._pmig_generated_modified = PMIG(polymorphic_type=self._ptype)
+
+        self._log_PO_id_map = None
+        self._log_Literal_map = None
 
     def get_pmux(self):
         '''
