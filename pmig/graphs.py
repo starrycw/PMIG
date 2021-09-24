@@ -805,7 +805,8 @@ class PMIG:
             return False
 
         else:
-            assert False
+            assert mig_n._type in ( _MIG_Node.CONST0, _MIG_Node.PI )
+
 
     def get_iter_nodes_with_polymorphic_pi(self):
         '''

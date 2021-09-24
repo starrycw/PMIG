@@ -291,7 +291,7 @@ class pmig_reader:
                 #     # self.read_poname(line)
                 #     self._pmig_task_ponames.append(line.rstrip('\n'))
 
-        assert len(self._pmig_tasks) == self._N
+        assert len(self._pmig_tasks) == self._N - 1
         for idx in range(1, self._N):
             task = self._pmig_tasks[idx]
             task_type = task[0]

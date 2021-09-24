@@ -6,12 +6,15 @@
 # @File    : graphs_polymorphic.py
 
 
-### import
+####### import
 from pmig import graphs
 PMIG = graphs.PMIG # alias
 
 from prettytable import PrettyTable
 import copy
+
+
+####### Literal Mapping类可以在将两个mig通过mux合并时存储映射信息。
 
 class Literal_Mapping:
     def __init__(self):
@@ -64,6 +67,7 @@ class Literal_Mapping:
             l_new_withattr = PMIG.add_attr_if_has_attr(f=l_new, c=l_original)
         else:
             assert False
+        return l_new_withattr
 
     def add_pi_merge_rules(self, merge_list):
         for pi_a, pi_b in merge_list:
@@ -120,7 +124,7 @@ class _Base_PMIG_Gen_Comb_2to1:
         self._mig_b = None
         self._pmux = None
         self._pmux_literals = None
-        self.__ptype = None
+        self._ptype = None
         self._merged_pis_list = None
         self._muxed_pos_list = None
         self._pmig_generated = None
@@ -205,6 +209,7 @@ class _Base_PMIG_Gen_Comb_2to1:
 
 
 ####### Set Configurations
+    # Muxed POs 应当以id指定，而merged PIs应当以literal（no attr）的方式指定
     def set_muxed_pos(self, fanin_list=None):
         '''
         Set self._muxed_pos_list list. If fanin_list == None, then the first min(_mig_b.n_pis(), __mig_a.n_pis()) POs will be added to the list.
@@ -266,7 +271,7 @@ class _Base_PMIG_Gen_Comb_2to1:
                         # pos_a.remove(a_i)
                         pos_b.remove(b_i)
                         log_list.append("Name:{}, ID in A:{}, ID in B:{}.".format(a_i[3], a_i[0], b_i[0]))
-            print("Finished! {} connection created!".format(len(log_list)))
+            print("Set muxed POs by name - Finished! Number:{}".format(len(log_list)))
             for info in log_list:
                 print(info)
             return len(log_list)
@@ -298,7 +303,7 @@ class _Base_PMIG_Gen_Comb_2to1:
                         # pis_named_a.remove(a_i)
                         pis_named_b.remove(b_i)
                         log_list.append("Name:{}, Literal in A:{}, Literal in B:{}.".format(a_i[1], a_i[0], b_i[0]))
-            print("Finished! {} connection created!".format(len(log_list)))
+            print("Set merged PIs by name - Finished! Number: {} ".format(len(log_list)))
             for info in log_list:
                 print(info)
             return len(log_list)
@@ -368,15 +373,25 @@ class _Base_PMIG_Gen_Comb_2to1:
 
 ####### 合并
     def pmig_generation(self, obsolete_muxed_pos = False):
-        pmig_new = PMIG(polymorphic_type=self.__ptype)
+        assert isinstance(self._mig_a, PMIG)
+        assert isinstance(self._mig_b, PMIG)
+
+        # Checks
+        for ii_a, ii_b in self._muxed_pos_list:
+            assert 0 <= ii_a < self._mig_a.n_pos()
+            assert 0 <= ii_b < self._mig_b.n_pos()
+        for ii_a, ii_b in self._merged_pis_list:
+            assert PMIG.is_noattribute_literal(ii_a)
+            assert PMIG.is_noattribute_literal(ii_b)
+            assert self._mig_a.is_pi(ii_a)
+            assert self._mig_b.is_pi(ii_b)
+
+        pmig_new = PMIG(polymorphic_type=self._ptype)
 
         # Initialize Literal_Mapping obj
         LMap = Literal_Mapping()
         LMap.add_pi_merge_rules(merge_list=self._merged_pis_list)
 
-
-        assert isinstance(self._mig_a, PMIG)
-        assert isinstance(self._mig_b, PMIG)
         # Nodes of subgraph A
         for l_i in self._mig_a.get_iter_nodes_all():
             if self._mig_a.has_name(f=l_i):
@@ -471,6 +486,7 @@ class _Base_PMIG_Gen_Comb_2to1:
             Dict_BPO_id_map[po_id] = po_id_new
 
         # Muxed POs
+        cnt_for_new_po_name = 0
         if 'ctl' in self._pmux_literals:
             ctl_newl = pmig_new.create_pi(name='PMUX_ctl')
         for fanin_a_id, fanin_b_id in self._muxed_pos_list:
@@ -494,7 +510,12 @@ class _Base_PMIG_Gen_Comb_2to1:
                 if self._pmux.is_const0(f=mux_n_l):
                     assert mux_n_l == PMIG.get_literal_const0()
                 elif self._pmux.is_pi(f=mux_n_l):
-                    assert (mux_n_l == mux_in_a) or (mux_n_l == mux_in_b)
+                    # print("################ {}, {}, {}".format(mux_n_l, mux_in_a, mux_in_b))
+                    if 'ctl' in self._pmux_literals:
+                        assert (mux_n_l == mux_in_a) or (mux_n_l == mux_in_b) or (mux_n_l == ctl_oldl)
+                    else:
+                        assert (mux_n_l == mux_in_a) or (mux_n_l == mux_in_b)
+
                 elif self._pmux.is_maj(f=mux_n_l):
                     mux_maj_ch0 = self._pmux.get_maj_child0(f=mux_n_l)
                     mux_maj_ch1 = self._pmux.get_maj_child1(f=mux_n_l)
@@ -511,9 +532,16 @@ class _Base_PMIG_Gen_Comb_2to1:
                 for po_id_new_temp in (Dict_APO_id_map[fanin_a_id], Dict_BPO_id_map[fanin_b_id]):
                     pmig_new.set_po_type(po=po_id_new_temp, po_type=PMIG.PO_OBSOLETE)
 
+            mux_po_old_fanin = self._pmux_literals['po']
+            mux_po_new_fanin = MMap.get_new_l(l_mux=mux_po_old_fanin)
+            mux_po_new_name = "MUXPO-{}".format(cnt_for_new_po_name)
+            pmig_new.create_po(f=mux_po_new_fanin, name=mux_po_new_name)
+            cnt_for_new_po_name = cnt_for_new_po_name + 1
+
         # Apply
         self._pmig_generated = copy.deepcopy(pmig_new)
         self._pmig_generated_modified = copy.deepcopy(pmig_new)
+        self._pmig_generated_modified = self._pmig_generated_modified.pmig_clean_pos_by_type(po_type_tuple=(graphs.PMIG.PO_OBSOLETE,))
 
 
 
@@ -524,7 +552,7 @@ class PMIG_Gen_Comb_2to1_PEdge(_Base_PMIG_Gen_Comb_2to1):
         super().__init__()
 
     def initialization(self, mig1, mig2):
-        self.__ptype = PMIG.PTYPE_ALL
+        self._ptype = PMIG.PTYPE_ALL
 
         assert isinstance(mig1, PMIG)
         assert isinstance(mig2, PMIG)
@@ -538,8 +566,8 @@ class PMIG_Gen_Comb_2to1_PEdge(_Base_PMIG_Gen_Comb_2to1):
 
         self._merged_pis_list = []
         self._muxed_pos_list = []
-        self._pmig_generated = PMIG(polymorphic_type=self.__ptype)
-        self._pmig_generated_modified = PMIG(polymorphic_type=self.__ptype)
+        self._pmig_generated = PMIG(polymorphic_type=self._ptype)
+        self._pmig_generated_modified = PMIG(polymorphic_type=self._ptype)
 
     def get_pmux(self):
         '''
@@ -547,7 +575,7 @@ class PMIG_Gen_Comb_2to1_PEdge(_Base_PMIG_Gen_Comb_2to1):
 
         :return: PMIG_obj, DICT - The PMIG of 2 to 1 MUX, and a dict.
         '''
-        pmux = PMIG(polymorphic_type=self.__ptype)
+        pmux = PMIG(polymorphic_type=self._ptype)
         literal_a = pmux.create_pi(name='in_a')
         literal_b = pmux.create_pi(name='in_b')
         literal_ac = pmux.create_maj(literal_a, pmux.get_literal_const0(), pmux.get_literal_const_1_0())  # M(a, 0, 1/0)
@@ -555,7 +583,7 @@ class PMIG_Gen_Comb_2to1_PEdge(_Base_PMIG_Gen_Comb_2to1):
         literal_abc = pmux.create_maj(literal_ac, literal_bc,
                                       pmux.get_literal_const1())  # M( M(a, 0, 1/0), M(b, 0, 0/1), 1)
         pmux.create_po(literal_abc, name="mux_PO")
-        return pmux, {'fanin_A': literal_a, 'fanin_B': literal_b}
+        return pmux, {'fanin_A': literal_a, 'fanin_B': literal_b, 'po':literal_abc}
 
 
 
@@ -575,7 +603,7 @@ class PMIG_Gen_Comb_2to1_PNode(_Base_PMIG_Gen_Comb_2to1):
         super().__init__()
 
     def initialization(self, mig1, mig2):
-        self.__ptype = PMIG.PTYPE_NO
+        self._ptype = PMIG.PTYPE_NO
 
         assert isinstance(mig1, PMIG)
         assert isinstance(mig2, PMIG)
@@ -589,8 +617,8 @@ class PMIG_Gen_Comb_2to1_PNode(_Base_PMIG_Gen_Comb_2to1):
 
         self._merged_pis_list = []
         self._muxed_pos_list = []
-        self._pmig_generated = PMIG(polymorphic_type=self.__ptype)
-        self._pmig_generated_modified = PMIG(polymorphic_type=self.__ptype)
+        self._pmig_generated = PMIG(polymorphic_type=self._ptype)
+        self._pmig_generated_modified = PMIG(polymorphic_type=self._ptype)
 
     def get_pmux(self):
         '''
@@ -598,7 +626,7 @@ class PMIG_Gen_Comb_2to1_PNode(_Base_PMIG_Gen_Comb_2to1):
 
         :return: PMIG_obj, DICT - The PMIG of 2 to 1 MUX, and a dict.
         '''
-        pmux = PMIG(polymorphic_type=self.__ptype)
+        pmux = PMIG(polymorphic_type=self._ptype)
         literal_a = pmux.create_pi(name='in_a')
         literal_b = pmux.create_pi(name='in_b')
         literal_c = pmux.create_pi(name='ctl')
@@ -607,4 +635,4 @@ class PMIG_Gen_Comb_2to1_PNode(_Base_PMIG_Gen_Comb_2to1):
                                      pmux.get_literal_const0())  # M(b, c', 0)
         literal_abc = pmux.create_maj(literal_ac, literal_bc, pmux.get_literal_const1())  # M( M(a,c,0), M(b, c', 0), 1)
         pmux.create_po(literal_abc, name="mux_PO")
-        return pmux, {'fanin_A': literal_a, 'fanin_B': literal_b, 'ctl': literal_c}
+        return pmux, {'fanin_A': literal_a, 'fanin_B': literal_b, 'ctl': literal_c, 'po':literal_abc}

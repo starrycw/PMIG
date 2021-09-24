@@ -24,7 +24,7 @@ path_aiger_dir = g_vars.get_value("path_aiger_dir")
 
 # Set Variables
 path_abc_srcfile = "rca2.v"
-#path_abc_srcfile = "ripple_8.blif"
+#path_abc_srcfile = "ripple_64.blif"
 
 status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", "rewrite"), echo_mode)
 print(status, warnings)
@@ -36,9 +36,10 @@ aig_1.fill_po_names()
 mig_1 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_1)
 print(mig_1)
 
+
 # Set Variables
 path_abc_srcfile = "rca2_inv.v"
-#path_abc_srcfile = "ripple_8.blif"
+#path_abc_srcfile = "ripple_64.blif"
 
 status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", "rewrite"), echo_mode)
 print(status, warnings)
@@ -50,79 +51,33 @@ aig_2.fill_po_names()
 mig_2 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_2)
 print(mig_2)
 
-print("##########ccc")
-pnode_muxed = graphs_polymorphic.PMIG_PEdge_comb(mig1=mig_1, mig2=mig_2)
-pnode_muxed.print_pis_of_mig()
-pnode_muxed.print_pos_of_mig()
-pnode_muxed.set_mux_auto()
-pnode_muxed.set_merged_pis_auto()
-pnode_muxed.pmig_generation(obsolete_muxed_pos=True)
+writer01 = graphs_io.pmig_writer(pmig_obj=mig_1)
+writer01.write_to_file(f_name='mig_1.pmig', f_path=path_abc_srcdir + '/', f_comments_list=['test','mig_1'])
 
-mig_muxed = pnode_muxed.get_pmig_generated()
-print(mig_muxed)
-writer1 = graphs_io.pmig_writer(mig_muxed)
-writer1.write_to_file(f_name="mig_muxed", f_path=path_abc_srcdir)
-for pi_l in mig_muxed.get_iter_pis():
-    name = mig_muxed.get_name_by_id(pi_l)
-    print( (pi_l, name) )
+writer02 = graphs_io.pmig_writer(pmig_obj=mig_2)
+writer02.write_to_file(f_name='mig_2.pmig', f_path=path_abc_srcdir + '/', f_comments_list=['test','mig_2'])
 
-node_with_multuple_fanout = pnode_muxed.op_get_all_nodes_with_multiple_fanouts()
-print(node_with_multuple_fanout)
+pmig_gen_pedge = graphs_polymorphic.PMIG_Gen_Comb_2to1_PEdge()
+pmig_gen_pedge.initialization(mig1=mig_1, mig2=mig_2)
+pmig_gen_pedge.set_merged_pis([(8,8)])
+pmig_gen_pedge.set_muxed_pos_auto()
+pmig_gen_pedge.pmig_generation(obsolete_muxed_pos=True)
+mig_pedge = pmig_gen_pedge._pmig_generated
+print(mig_pedge)
+writer03 = graphs_io.pmig_writer(pmig_obj=mig_pedge)
+writer03.write_to_file(f_name='mig_pedge.pmig', f_path=path_abc_srcdir + '/', f_comments_list=['test','mig_pedge'])
 
 
-pnode_muxed.opti_clean_pos_by_type()
-mig_muxed = pnode_muxed.get_pmig_generated()
-print(mig_muxed)
-writer1 = graphs_io.pmig_writer(mig_muxed)
-writer1.write_to_file(f_name="mig_muxed_opti", f_path=path_abc_srcdir)
-for pi_l in mig_muxed.get_iter_pis():
-    name = mig_muxed.get_name_by_id(pi_l)
-    print( (pi_l, name) )
+pmig_gen_pnode = graphs_polymorphic.PMIG_Gen_Comb_2to1_PNode()
+pmig_gen_pnode.initialization(mig1=mig_1, mig2=mig_2)
+pmig_gen_pnode.set_merged_pis([(8,8)])
+pmig_gen_pnode.set_muxed_pos_auto()
+pmig_gen_pnode.pmig_generation(obsolete_muxed_pos=True)
+mig_pnode = pmig_gen_pnode._pmig_generated
+print(mig_pnode)
+writer04 = graphs_io.pmig_writer(pmig_obj=mig_pnode)
+writer04.write_to_file(f_name='mig_pnode.pmig', f_path=path_abc_srcdir + '/', f_comments_list=['test','mig_pnode'])
 
 
-root = 100
-n=4
-print("####################################################")
-node_with_multuple_fanout = pnode_muxed.op_get_all_nodes_with_multiple_fanouts()
-print(node_with_multuple_fanout)
-
-
-print(pnode_muxed.get_pmig_generated())
-
-
-
-cut_pmig, cut_map_pi, cut_map_po, leaves, visited = pnode_muxed.op_get_n_cut_with_multifanout_checks(root_l=root, n=n)
-print(cut_pmig)
-print(cut_map_pi)
-print(cut_map_po)
-print(leaves)
-print(visited)
-print("######################################################")
-es1 = exact_synthesis.ExactSynthesis_4Cut(cut_pmig)
-es1._update_po_value()
-print(es1.get_po_value())
-
-
-
-# pmig_veri1 = pmig_veri.PMIG_Verification(pmig_obj=mig_muxed)
-# pmig_veri1.print_pis_id(more_info=True)
-# simu_info, simu_result, simu_result_xx = pmig_veri1.run_simu()
-# print(simu_info[0])
-# print(simu_info[1])
-# print(simu_info[2])
-# print(len(simu_result))
-# print(simu_result)
-# print(simu_result_xx)
-
-# mig_new = mig_1.pmig_clean_irrelevant_nodes()
-#
-# pmig_veri2 = pmig_veri.PMIG_Verification(pmig_obj=mig_new)
-# pmig_veri2.print_pis_id(more_info=True)
-# simu_result2 = pmig_veri2.run_simu()
-# print(len(simu_result2))
-# print(simu_result2)
-#
-# print(simu_result == simu_result2)
-# print(simu_result is simu_result2)
 
 
