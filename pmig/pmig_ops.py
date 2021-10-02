@@ -13,14 +13,286 @@ from prettytable import PrettyTable
 import copy
 
 class PMIG_operator:
+#######
     def __init__(self):
         self._pmig_obj = None # 作为操作对象的PMIG，它不应当被修改
         self._ptype = None # PMIG的多态类型
 
+#######
     def initialization(self, mig_obj):
         assert isinstance(mig_obj, PMIG)
         self._pmig_obj = copy.deepcopy(mig_obj)
         self._ptype = self._pmig_obj.attr_ptype_get()
+
+#######
+    @staticmethod
+    def op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r, root_l, n, stop_list=[]):
+        '''
+        输入一个root_l（literal)，以及整数n，返回一个以root_l对应的node为root的n割集PMIG对象。
+        使用reconvergence-driven cut computation算法。
+        注意：stop_list应当包含一些node的literal（无属性），默认为空。
+        该列表中的literal所对应的node在本方法中被视为类似于PI，即无扇入。
+        该列表的意义是：避免列表中的node被作为一个cut的leaves与root之间的中间node。
+        例如，某个node具有多个扇出，因此不希望它作为一个cut的中间node被优化掉，此时就可以借助stop_list。
+
+        :param pmig_obj_r:
+        :param root_l:
+        :param n:
+        :return:
+        '''
+
+        assert isinstance(pmig_obj_r, PMIG)
+
+        # 迭代执行，尝试将nodeset_leaves中node的扇入来替换该node作为leaves。每次被替换的node都是非stop的并且具有最低cost的，并且替换必须不能使leaves数目超过限制。
+        def construct_cut_rec(nodeset_leaves, nodeset_visited, size_limit, stop_list):
+            def is_stop_node(l):
+                if pmig_obj_r.is_pi(l):
+                    return True
+                if pmig_obj_r.is_const0(l):
+                    return True
+                if l in stop_list:
+                    return True
+                return False
+
+            assert isinstance(nodeset_leaves, list)
+            assert isinstance(nodeset_visited, list)
+            assert PMIG.get_literal_const0() in nodeset_leaves
+
+            if if_all_nodes_are_stop_nodes(leaves=nodeset_leaves, stop_list=stop_list):
+                return nodeset_leaves, nodeset_visited
+
+            min_cost = 10
+            node_with_min_cost = None
+            for n_i in (l_nodes for l_nodes in nodeset_leaves if not is_stop_node(l=l_nodes)):
+                cost_i = leaf_cost(node_m=n_i, visited=nodeset_visited)
+                if cost_i < min_cost:
+                    min_cost = cost_i
+                    node_with_min_cost = n_i
+            assert (min_cost < 10) and (node_with_min_cost is not None)
+            if (len(nodeset_leaves) + min_cost) > (size_limit + 1):  # size_limit+1是由于考虑到存在一个CONST0
+                return nodeset_leaves, nodeset_visited
+
+            for fanin_i in pmig_obj_r.get_maj_fanins(node_with_min_cost):
+                if (PMIG.get_noattribute_literal(f=fanin_i)) not in nodeset_leaves:
+                    nodeset_leaves.append(PMIG.get_noattribute_literal(f=fanin_i))
+            assert node_with_min_cost in nodeset_leaves
+            nodeset_leaves.remove(node_with_min_cost)
+            assert node_with_min_cost not in nodeset_leaves
+
+            for fanin_i in pmig_obj_r.get_maj_fanins(node_with_min_cost):
+                if (PMIG.get_noattribute_literal(f=fanin_i)) not in nodeset_visited:
+                    nodeset_visited.append(PMIG.get_noattribute_literal(f=fanin_i))
+
+            return construct_cut_rec(nodeset_leaves=nodeset_leaves, nodeset_visited=nodeset_visited,
+                                     size_limit=size_limit, stop_list=stop_list)
+
+        # 用于检查leaves列表中的nodes是否全部都不可被扇入替代了。这作为迭代的终止条件之一。
+        def if_all_nodes_are_stop_nodes(leaves, stop_list):
+            def is_stop_node(l):
+                if pmig_obj_r.is_pi(l):
+                    return True
+                if pmig_obj_r.is_const0(l):
+                    return True
+                if l in stop_list:
+                    return True
+                return False
+
+            for l in leaves:
+                if not is_stop_node(l):
+                    return False
+            return True
+
+        # cost函数
+        def leaf_cost(node_m, visited):
+            cost = -1
+            # print(node_m)
+            for ch_l in pmig_obj_r.get_maj_fanins(node_m):
+                if PMIG.get_noattribute_literal(ch_l) not in visited:
+                    cost = cost + 1
+            return cost
+
+        # main
+        nodeset_leaves = [root_l, PMIG.get_literal_const0()]
+        nodeset_visited = [root_l]
+        stop_list = tuple(stop_list)
+        return construct_cut_rec(nodeset_leaves=nodeset_leaves, nodeset_visited=nodeset_visited, size_limit=n,
+                                 stop_list=stop_list)
+
+
+#######
+    @staticmethod
+    def op_number_of_fanouts(pmig_obj_r, target_l):
+        '''
+        输入一个node的literal， 返回这个node的扇出数目, 以及扇出到的node的literals列表。
+
+        :param l:
+        :return:
+        '''
+        assert isinstance(pmig_obj_r, PMIG)
+        n_fanout = 0
+        fanout_list = []
+        target_id = target_l >> 2
+        for node_l in pmig_obj_r.get_iter_nodes_all():
+            if pmig_obj_r.is_maj(f=node_l):
+                for ch_l in pmig_obj_r.get_maj_fanins(f=node_l):
+                    ch_id = ch_l >> 2
+                    if ch_id == target_id:
+                        if node_l not in fanout_list:
+                            n_fanout = n_fanout + 1
+                            fanout_list.append(node_l)
+            elif pmig_obj_r.is_latch(f=node_l):
+                assert False
+            else:
+                assert (pmig_obj_r.is_pi(f=node_l) or pmig_obj_r.is_const0(f=node_l))
+        return n_fanout, fanout_list
+
+#######
+    @staticmethod
+    def op_get_all_nodes_with_multiple_fanouts(pmig_obj_r, limit_number=1):
+        '''
+        返回一个元组，包含扇出数目大于limit_number(默认为1)的MAJ node的literal及扇出到的literals。即元组的元素为 (符合条件的node的literal, [扇出目标的literal...])
+
+        注意：这里的扇出数目指的是扇出目标nodes的数目，即若node B的两个扇入均为node A，那么node B也只会为为node A的扇出数目统计加1而不是加2。
+
+        与op_get_all_nodes_with_multiple_fanouts_fast方法功能相同，但是本方法会更慢一些。
+
+        :param limit_number:
+        :return:
+        '''
+        assert isinstance(pmig_obj_r, PMIG)
+        node_list = []
+        for node_l in pmig_obj_r.get_iter_nodes_all():
+            n, ls = PMIG_operator.op_number_of_fanouts(pmig_obj_r=pmig_obj_r, target_l=node_l)
+            if (n > limit_number) and (pmig_obj_r.is_maj(f=node_l)):
+                node_list.append((node_l, ls))
+        node_tuple = tuple(copy.deepcopy(node_list))
+        return node_tuple
+
+#######
+    @staticmethod
+    def op_get_all_nodes_with_multiple_fanouts_fast(pmig_obj_r, limit_number=1):
+        '''
+        返回一个元组，包含扇出数目大于limit_number(默认为1)的MAJ node的literal及扇出到的literals。即元组的元素为 (符合条件的node的literal, [扇出目标的literal...])
+
+        注意：这里的扇出数目指的是扇出目标nodes的数目，即若node B的两个扇入均为node A，那么node B也只会为为node A的扇出数目统计加1而不是加2。
+
+        与op_get_all_nodes_with_multiple_fanouts方法功能相同，但是本方法会更快一些。
+
+        :param limit_number:
+        :return:
+        '''
+        assert isinstance(pmig_obj_r, PMIG)
+        list_n_fanout_target = []  # 包含了每个node的扇出目标nodes的数目。索引对应node id，因此也包含了const0和pi，虽然没有用处
+        list_fanout_targets = []  # 对应上面的列表，这个列表包含的元素为列表，列表中是扇出目标nodes的literal(noattr)，不重复
+
+        for node_l in pmig_obj_r.get_iter_nodes_all():
+            node_id = node_l >> 2
+            assert len(list_n_fanout_target) == node_id
+            list_n_fanout_target.append(0)
+            list_fanout_targets.append([])
+            if pmig_obj_r.is_maj(f=node_l):
+                for ch_l in pmig_obj_r.get_maj_fanins(f=node_l):
+                    ch_id = ch_l >> 2
+                    if node_l not in list_fanout_targets[ch_id]:
+                        list_fanout_targets[ch_id].append(node_l)
+                        list_n_fanout_target[ch_id] = list_n_fanout_target[ch_id] + 1
+            else:
+                assert pmig_obj_r.is_const0(f=node_l) or pmig_obj_r.is_pi(f=node_l)
+
+        assert pmig_obj_r.n_nodes() == len(list_n_fanout_target)
+        assert pmig_obj_r.n_nodes() == len(list_fanout_targets)
+        result_list = []
+        for idx in range(0, pmig_obj_r.n_nodes()):
+            if (list_n_fanout_target[idx] > limit_number) and (pmig_obj_r.is_maj(f=idx << 2)):
+                idx_l = idx << 2
+                idx_targets = list_fanout_targets[idx]
+                assert len(idx_targets) == list_n_fanout_target[idx]
+                result_list.append((idx_l, idx_targets))
+        result_tuple = tuple(copy.deepcopy(result_list))
+        return result_tuple
+
+
+#######
+    @staticmethod
+    def op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r, root_l, n, multi_fanout_nodes_list):
+        '''
+        op_reconvergence_driven_cut_computation_with_stop_list的增强版！
+
+        输入一个root_l（literal)，以及整数n，返回一个以root_l对应的node为root的n割集PMIG对象，并且割集的内部nodes不会扇出到不被割集包含的node。
+        使用reconvergence-driven cut computation算法。
+        注意：stop_list应当包含一些node的literal（无属性），默认为空。
+        该列表中的literal所对应的node在本方法中被视为类似于PI，即无扇入。
+        该列表的意义是：避免列表中的node被作为一个cut的leaves与root之间的中间node。
+        例如，某个node具有多个扇出，因此不希望它作为一个cut的中间node被优化掉，此时就可以借助stop_list。
+
+        :param pmig_obj_r:
+        :param root_l:
+        :param n:
+        :param multi_fanout_nodes_list: 应当为op_get_all_nodes_with_multiple_fanouts_fast或op_get_all_nodes_with_multiple_fanouts的返回元组
+        :return:
+        '''
+        # 此函数用于检查割集是否符合要求（即内部node的扇出均被node包含），若不符合要求，则给出需要扩充到stop list中的literal
+        def check_inner_nodes(nodeset_leaves, nodeset_visited, nlist):
+            if_satisfied = True # 当前割集是否已满足要求
+            return_literals = [] # 需要扩充到stop list的nodes
+            worst_literal = None # 具有最多数量的不被割集包含的扇出目标的node
+            worst_n = 0
+            # 获得leaves中最大的literal
+            leaves_max = 0
+            for leaves_i in nodeset_leaves:
+                if leaves_i > leaves_max:
+                    leaves_max = leaves_i
+            # 若一个node的扇出不在visited中，并且literal大于最大的leaves literal， 那么应当加入stop_list
+            # 同时，会记录worst node（即不在visited中的fanout的数目最多的node），作为备选。
+            for mfn in nlist:
+                n = 0
+                mfn_l = mfn[0]
+                mfn_llist = mfn[1]
+                if ((mfn_l in nodeset_visited) and (mfn_l not in nodeset_leaves)):
+                    for mfn_llist_i in mfn_llist:
+                        if mfn_llist_i not in nodeset_visited:
+                            if_satisfied = False
+                            n = n + 1
+                            if ((mfn_llist_i > leaves_max) and (mfn_l not in return_literals)):
+                                return_literals.append(mfn_l)
+                if n > worst_n:
+                    worst_literal = mfn_l
+                    worst_n = n
+
+            if (not if_satisfied) and (len(return_literals) == 0):
+                return_literals.append(worst_literal)
+
+            return if_satisfied, return_literals
+
+        # main
+
+        # 将不可包含的点加入stop_list，这些点至少有一个扇出到的node具有比root大的literal
+        stop_list_current = []
+
+        # 如果一个node存在一个扇出的node，其literal大于root node的literal，那么该node不能作为cut的内部node
+        for mfn in multi_fanout_nodes_list:
+            i = 0
+            mfn_l = mfn[0]
+            mfn_llist = mfn[1]
+            for ll in mfn_llist:
+                if ll > root_l:
+                    i = i + 1
+            if i > 0:
+                stop_list_current.append(mfn_l)
+
+        if_satisfied = False
+        while (not if_satisfied):
+            nodeset_leaves, nodeset_visited = PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=pmig_obj_r,
+                                                                                                          root_l=root_l,
+                                                                                                          n=n,
+                                                                                                          stop_list=stop_list_current)
+            if_satisfied, additional_stop_nodes = check_inner_nodes(nodeset_leaves=nodeset_leaves,
+                                                                    nodeset_visited=nodeset_visited,
+                                                                    nlist=multi_fanout_nodes_list)
+            for l_i in additional_stop_nodes:
+                stop_list_current.append(l_i)
+
+        return nodeset_leaves, nodeset_visited
 
 
 
@@ -87,7 +359,7 @@ class PMIG_optimization:
         '''
         清除某些类型的POs， 并清除多余的nodes。
 
-        :param pos: TUPLE - POs类型元组，默认包含PMIG.PO_OBSOLETE.
+        :param po_type_tuple: TUPLE - POs类型元组，默认包含PMIG.PO_OBSOLETE.
         :return:
         '''
         assert isinstance(self._pmig_current, PMIG)
