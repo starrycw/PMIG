@@ -45,3 +45,6 @@ print(mf_1 == mf_2)
 
 print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=copy.deepcopy(mig_1), root_l=1000, n=6))
 print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=1000, n=6, multi_fanout_nodes_list=mf_2))
+
+cut_1 = pmig_ops.PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=1000, n=6)
+print(cut_1)

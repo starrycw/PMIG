@@ -125,7 +125,7 @@ class PMIG_operator:
         '''
         输入一个node的literal， 返回这个node的扇出数目, 以及扇出到的node的literals列表。
 
-        :param l:
+        :param target_l:
         :return:
         '''
         assert isinstance(pmig_obj_r, PMIG)
@@ -293,6 +293,99 @@ class PMIG_operator:
                 stop_list_current.append(l_i)
 
         return nodeset_leaves, nodeset_visited
+
+#######
+    class Cut_Mapping:
+        '''
+        这个类是为了存储n-cut与原图之间的nodes映射关系
+        '''
+
+        def __init__(self):
+            self._nodes_mapping = {}  # 原图中的nodes literal（无属性）：cut图中的nodes literal（无属性）
+
+        def add_nodes_mapping(self, l_old, l_new):
+            # assert not PMIG.is_negated_literal(l_old)
+            # assert not PMIG.is_polymorphic_literal(l_old)
+            # assert not PMIG.is_negated_literal(l_new)
+            # assert not PMIG.is_polymorphic_literal(l_new)
+            assert PMIG.is_noattribute_literal(l_old)
+            assert PMIG.is_noattribute_literal(l_new)
+            assert l_old not in self._nodes_mapping
+            self._nodes_mapping[l_old] = l_new
+
+        def get_new_literal(self, l_old):
+            # l_old_noattr = PMIG.get_positive_normal_literal(f=l_old)
+            l_old_noattr = PMIG.get_noattribute_literal(f=l_old)
+            assert l_old_noattr in self._nodes_mapping
+            l_new_noattr = self._nodes_mapping[l_old_noattr]
+            l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_old)
+            return l_new
+#######
+    @staticmethod
+    def op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r, root_l, n):
+        '''
+        获得以root_l(literal)为root的n-cut，并将获得的cut构建一个PMIG用于优化。
+
+        return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited
+
+        cut_map_pi 为字典，存储着生成的图的PI与cut leaves之间的对应关系，key为生成的PMIG的PI literal， value为cut的leaves literal
+
+        cut_map_po 为元组：(cut_map.get_new_literal(root_l), root_l)
+
+        nodeset_leaves, nodeset_visited 为割集的信息
+
+        :param pmig_obj_r:
+        :param root_l: INT - root node的literal
+        :param n: INT - leaves数目上限
+        :return:
+        '''
+
+        assert isinstance(pmig_obj_r, PMIG)
+        multifanout_list = PMIG_operator.op_get_all_nodes_with_multiple_fanouts_fast(pmig_obj_r=pmig_obj_r)
+        # Get n-cut
+        nodeset_leaves, nodeset_visited = PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=pmig_obj_r, root_l=root_l, n=n, multi_fanout_nodes_list=multifanout_list)
+        nodeset_cone = pmig_obj_r.get_cone(roots=(root_l,), stop=nodeset_leaves)
+        # checks
+        for i in nodeset_visited:
+            assert (i in nodeset_leaves) or (i in nodeset_cone)
+        for i in nodeset_cone:
+            assert i in nodeset_visited
+        for i in nodeset_leaves:
+            assert i in nodeset_visited
+        assert len(nodeset_leaves) + len(nodeset_cone) == len(nodeset_visited)
+
+        # Create PMIG
+        pmig_cut = PMIG(polymorphic_type=pmig_obj_r.attr_ptype_get())
+        cut_map = PMIG_operator.Cut_Mapping()
+        # PI
+        for i in nodeset_leaves:
+            if i == pmig_cut.get_literal_const0():
+                cut_map.add_nodes_mapping(l_old=i, l_new=i)
+            else:
+                new_l = pmig_cut.create_pi()
+                cut_map.add_nodes_mapping(l_old=i, l_new=new_l)
+        # MAJ
+        for i in nodeset_cone:
+            assert pmig_obj_r.is_maj(f=i)
+            ch0, ch1, ch2 = pmig_obj_r.get_maj_fanins(f=i)
+            ch0_new = cut_map.get_new_literal(l_old=ch0)
+            ch1_new = cut_map.get_new_literal(l_old=ch1)
+            ch2_new = cut_map.get_new_literal(l_old=ch2)
+            new_l = pmig_cut.create_maj(child0=ch0_new, child1=ch1_new, child2=ch2_new)
+            cut_map.add_nodes_mapping(l_old=i, l_new=new_l)
+
+        # PO
+        pmig_cut.create_po(f=cut_map.get_new_literal(root_l))
+
+        # Collect info
+        cut_map_po = (cut_map.get_new_literal(root_l), root_l)
+        cut_map_pi = {}
+        for i in nodeset_leaves:
+            key = cut_map.get_new_literal(l_old=i)
+            cut_map_pi[key] = i
+
+        # return
+        return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited
 
 
 
