@@ -12,9 +12,6 @@ g_vars._init()
 from pmig import convert_to_graph
 from pmig import graphs
 from pmig import graphs_io
-from pmig import graphs_polymorphic
-from pmig import pmig_verification as pmig_veri
-from pmig import exact_synthesis
 from pmig import pmig_ops
 
 # Get global variables from global_vars

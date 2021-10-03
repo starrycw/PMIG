@@ -5,7 +5,7 @@
 # @File    : test2.py
 
 import sys
-import copy
+
 sys.path.append("..")
 import global_vars as g_vars
 g_vars._init()
@@ -13,8 +13,6 @@ from pmig import convert_to_graph
 from pmig import graphs
 from pmig import graphs_io
 from pmig import graphs_polymorphic
-from pmig import pmig_verification as pmig_veri
-from pmig import exact_synthesis
 
 # Get global variables from global_vars
 echo_mode = g_vars.get_value("echo_mode")

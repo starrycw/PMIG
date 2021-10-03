@@ -1,1 +1,1 @@
-__all__ = ['convert_to_graph.py', 'graphs.py', 'graphs_io.py', 'graphs_polymorphic.py', 'pmig_verification.py']
+__all__ = ['convert_to_graph.py', 'graphs.py', 'graphs_io.py', 'graphs_polymorphic.py', 'pmig_ops.py', 'exact_synthesis.py', 'pmig_logic']
