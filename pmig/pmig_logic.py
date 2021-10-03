@@ -554,3 +554,67 @@ class PMIG_LogicSimu_Comb:
 
         return result_pos_value_simple, result_pos_value, pos_selected, pi_vec
 
+
+    def simu_for_exact_synthesis(self):
+        '''
+        仿真一个单PO、无latch、无buffer的PMIG图的逻辑功能，用于exact synthesis。
+
+        返回值包括：
+        (1) 一个元组，元素依次为PI从全0到全1时PO在模式1下的输出逻辑值。逻辑值仅有0和1两种情况。
+        (2) 一个元组，元素依次为PI从全0到全1时PO在模式2下的输出逻辑值。逻辑值仅有0和1两种情况。
+        (3) Bool， 若上面两个元组相等，意味着该图的PO在两种模式下功能相同，可认为非多态，此时为False。繁反之为True。
+
+        :return: TUPLE, TUPLE, BOOL
+        '''
+        self.reset_all()
+
+        result_mixed = []
+        pi_len = len(self._pis_id)
+
+        vec_max = pow(2, pi_len)
+        for vec_value in range(0, vec_max):
+            vec_bin = bin(vec_value)[2:]
+            vec_tuple = tuple(str.zfill(vec_bin, pi_len))
+            # print(len(vec_tuple), pi_len, latch_len)
+            assert len(vec_tuple) == pi_len
+            vec_pi_tuple = vec_tuple[:pi_len]
+            pi_vec = []
+            for i in vec_pi_tuple:
+                if int(i) == 0:
+                    pi_vec.append(self.LVALUE_V_00)
+                elif int(i) == 1:
+                    pi_vec.append(self.LVALUE_V_11)
+                else:
+                    assert False
+
+            assert len(self.return_pmig_pos_list()) == 1
+            result_pos_value_simple, result_pos_value, pos_selected, pi_vec = self.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
+
+            assert len(result_pos_value) == 1
+            result_mixed.append(result_pos_value[0][0])
+
+        # 分别将两种模式下的结果记录在两个列表中
+        result_f1 = []
+        result_f2 = []
+        if_polymorphic = False
+        for mixed_value in result_mixed:
+            if mixed_value == self.LVALUE_V_00:
+                result_f1.append(0)
+                result_f2.append(0)
+            elif mixed_value == self.LVALUE_V_11:
+                result_f1.append(1)
+                result_f2.append(1)
+            elif mixed_value == self.LVALUE_V_P01:
+                result_f1.append(0)
+                result_f2.append(1)
+                if_polymorphic = True
+            elif mixed_value == self.LVALUE_V_P10:
+                result_f1.append(1)
+                result_f2.append(0)
+                if_polymorphic = True
+            else:
+                print(mixed_value)
+                assert False
+
+        return tuple(copy.deepcopy(result_f1)), tuple(copy.deepcopy(result_f2)), if_polymorphic
+

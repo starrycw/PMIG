@@ -41,24 +41,30 @@ print(mf_1)
 print(mf_2)
 print(mf_1 == mf_2)
 
-print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=copy.deepcopy(mig_1), root_l=20, n=6))
-print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=20, n=6, multi_fanout_nodes_list=mf_2))
+print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=6))
+print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=6, multi_fanout_nodes_list=mf_2))
 
-cut_1 = pmig_ops.PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=20, n=6)
+cut_1 = pmig_ops.PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=6)
 print(cut_1)
 
-logicsimu1 = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=mig_1)
+# logicsimu1 = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=mig_1)
+#
+# logicsimu1.print_pis_id(more_info=True)
+#
+#
+# LV_00 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_00
+# LV_01 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_P01
+# LV_10 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_P10
+# LV_11 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_11
+# LV_X0 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_PX0
+# LV_X1 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_PX1
+# LV_XX = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_PXX
+# LV_0X = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_P0X
+# LV_1X = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_P1X
+# print(logicsimu1.simu_pos_value(pi_vec=[LV_10, LV_11, LV_10, LV_11]))
 
-logicsimu1.print_pis_id(more_info=True)
+logicsimu2 = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_1[0])
 
+logicsimu2.print_pis_id(more_info=True)
 
-LV_00 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_00
-LV_01 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_P01
-LV_10 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_P10
-LV_11 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_11
-LV_X0 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_PX0
-LV_X1 = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_PX1
-LV_XX = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_PXX
-LV_0X = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_P0X
-LV_1X = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_P1X
-print(logicsimu1.simu_pos_value(pi_vec=[LV_10, LV_11, LV_10, LV_11]))
+print(logicsimu2.simu_for_exact_synthesis())
