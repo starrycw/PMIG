@@ -99,7 +99,7 @@ class PMIG_Cut_ExactSynthesis:
         重建z3 solver，创建z3变量。
         n_maj_nodes为MAJ nodes数目。
 
-        :param n_nodes:
+        :param n_maj_nodes:
         :return:
         '''
         # Z3 Solver
@@ -181,7 +181,7 @@ class PMIG_Cut_ExactSynthesis:
         重建z3 solver，创建z3变量，并添加约束。
         n_maj_nodes为MAJ nodes数目。
 
-        :param n_nodes:
+        :param n_maj_nodes:
         :return:
         '''
 
