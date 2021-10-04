@@ -34,7 +34,9 @@ class PMIG_Cut_ExactSynthesis:
         self._z3_solver = None
 
         # Z3 列表
-        self._z3_nodes_list = None # Nodes的主列表，元素为布尔，表示node的值。从索引0开始，依次对应const 0，PIs，以及MAJs。
+        self._z3_nodes_func1 = None
+        self._z3_nodes_func2 = None
+        # Nodes的主列表，元素为布尔，表示node的值。从索引0开始，依次对应const 0，PIs，以及MAJs。
 
         self._z3_ch0_idx = None
         self._z3_ch1_idx = None
@@ -50,7 +52,7 @@ class PMIG_Cut_ExactSynthesis:
         # 对于const0和PIs来说，它们不存在扇入，因此在这3个列表中对应值均为False即可。
         # 对于MAJs来说，这三个列表中分别是它的三个扇入edge的取反属性。
 
-        self._z3_ch0_poltmorphic = None
+        self._z3_ch0_polymorphic = None
         self._z3_ch1_polymorphic = None
         self._z3_ch2_polymorphic = None
         # 存储着Nodes的扇入多态属性。元素为bool，表示是否有多态属性。
@@ -92,7 +94,7 @@ class PMIG_Cut_ExactSynthesis:
 
 #####################CREATE SOLVER
 #######
-    def _createsolver_create_vars(self, n_maj_nodes):
+    def _subtask_create_vars(self, n_maj_nodes):
         '''
         重建z3 solver，创建z3变量。
         n_maj_nodes为MAJ nodes数目。
@@ -104,8 +106,9 @@ class PMIG_Cut_ExactSynthesis:
         self._z3_solver = Solver()
 
         # Z3 列表
-        self._z3_nodes_list = BoolVector('Node', (
-                    1 + self.get_n_pis() + n_maj_nodes))  # Nodes的主列表，元素为布尔，表示node的值。从索引0开始，依次对应const 0，PIs，以及MAJs。
+        self._z3_nodes_func1 = [ [Bool('NodeFunc1_{}_{}'.format(i, j)) for j in range(0, self._n_func)] for i in range(0, (1 + self.get_n_pis() + n_maj_nodes)) ]
+        self._z3_nodes_func2 = [ [Bool('NodeFunc2_{}_{}'.format(i, j)) for j in range(0, self._n_func)] for i in range(0, (1 + self.get_n_pis() + n_maj_nodes)) ]
+        # Nodes的主列表，二维列表，元素为布尔，表示node的值。外层从索引0开始，依次对应const 0，PIs，以及MAJs。内层从索引0到索引self._n_func，依次对应每个PI向量。
 
         self._z3_ch0_idx = IntVector('Ch0_idx', (1 + self.get_n_pis() + n_maj_nodes))
         self._z3_ch1_idx = IntVector('Ch1_idx', (1 + self.get_n_pis() + n_maj_nodes))
@@ -121,7 +124,7 @@ class PMIG_Cut_ExactSynthesis:
         # 对于const0和PIs来说，它们不存在扇入，因此在这3个列表中对应值均为False即可。
         # 对于MAJs来说，这三个列表中分别是它的三个扇入edge的取反属性。
 
-        self._z3_ch0_poltmorphic = BoolVector('Ch0_po', (1 + self.get_n_pis() + n_maj_nodes))
+        self._z3_ch0_polymorphic = BoolVector('Ch0_po', (1 + self.get_n_pis() + n_maj_nodes))
         self._z3_ch1_polymorphic = BoolVector('Ch1_po', (1 + self.get_n_pis() + n_maj_nodes))
         self._z3_ch2_polymorphic = BoolVector('Ch2_po', (1 + self.get_n_pis() + n_maj_nodes))
         # 存储着Nodes的扇入多态属性。元素为bool，表示是否有多态属性。
@@ -132,6 +135,45 @@ class PMIG_Cut_ExactSynthesis:
         self._z3_po_idx = Int('PO_idx')  # int类型，是PO的扇入node在主列表中的idx
         self._z3_po_negated = Bool('PO_ne')  # bool， 表示PO的扇入edge是否取反
         self._z3_po_polymorphic = Bool('PO_po')  # bool， 表示PO的扇入edge是否多态
+
+    def _subtask_constraint_lock_vars(self, n_maj_nodes):
+        '''
+        将无用的变量（如PI nodes的扇入）以及具有固定值的变量（比如，不允许多态时，多态edge属性应为False）约束为应有的值。
+
+        :param n_maj_nodes:
+        :return:
+        '''
+        assert isinstance(self._z3_solver, Solver)
+
+        # const0和PI的扇入
+        for ii in range(0, (1 + self.get_n_pis())):
+            self._z3_solver.add(self._z3_ch0_idx == 0)
+            self._z3_solver.add(self._z3_ch1_idx == 0)
+            self._z3_solver.add(self._z3_ch2_idx == 0)
+
+            self._z3_solver.add(self._z3_ch0_negated == False)
+            self._z3_solver.add(self._z3_ch1_negated == False)
+            self._z3_solver.add(self._z3_ch2_negated == False)
+
+            self._z3_solver.add(self._z3_ch0_polymorphic == False)
+            self._z3_solver.add(self._z3_ch1_polymorphic == False)
+            self._z3_solver.add(self._z3_ch2_polymorphic == False)
+
+        # const0
+        for ii in range(0, self._n_func):
+            self._z3_solver.add(self._z3_nodes_func1[0][ii] == False)
+            self._z3_solver.add(self._z3_nodes_func2[0][ii] == False)
+
+        # polymorphic
+        if not self._allow_polymorphic:
+            for ii in range(0, (1 + self.get_n_pis() + n_maj_nodes)):
+                self._z3_solver.add(self._z3_ch0_polymorphic == False)
+                self._z3_solver.add(self._z3_ch1_polymorphic == False)
+                self._z3_solver.add(self._z3_ch2_polymorphic == False)
+
+
+
+
 
 #######
     def create_solver(self, n_maj_nodes):
@@ -147,7 +189,11 @@ class PMIG_Cut_ExactSynthesis:
         assert n_maj_nodes > 0
 
         # 重建Solver和变量
-        self._createsolver_create_vars(n_maj_nodes=n_maj_nodes)
+        self._subtask_create_vars(n_maj_nodes=n_maj_nodes)
+        # 约束不可变变量
+        self._subtask_constraint_lock_vars(n_maj_nodes=n_maj_nodes)
+
+
 
 
 
