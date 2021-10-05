@@ -15,7 +15,7 @@
     make ABC_USE_NO_READLINE=1 ABC_USE_PIC=1 libabc.so
     ```
     
-  - (3) 将 abcd.i文件复制到/src目录中，并在该目录中执行：
+  - (3) 将 abcd.i文件复制到/src目录中，并在/src目录中执行：
     ```
     swig -python abcd.i
     ```
@@ -24,7 +24,7 @@
     ```
     /usr/include/python3.9/
     ```
-    在abc-master/src目录中依次执行：
+    在/src目录中依次执行：
     ```
     gcc -fPIC -c -I/usr/include/python3.9/ -I/home/xxx/abc-master/src abcd_wrap.c
     g++ -shared -fPIC -o _abcd.so `find . -name \*.o`
