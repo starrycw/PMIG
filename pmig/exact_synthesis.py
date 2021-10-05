@@ -47,35 +47,44 @@ class PMIG_Cut_ExactSynthesis:
         # Z3 列表
         self._z3_nodes_func1 = None
         self._z3_nodes_func2 = None
-        # Nodes的主列表，元素为布尔，表示node的值。从索引0开始，依次对应const 0，PIs，以及MAJs。
+        # Nodes的主列表，列表元素为Function。列表索引从0开始，长度为self._n_func，代表输入向量。每个Function的自变量代表着node的索引。
 
         self._z3_ch0_idx = None
         self._z3_ch1_idx = None
         self._z3_ch2_idx = None
-        # 存储着Nodes的扇入idx。元素为int，表示在主列表中的索引位置。
-        # 对于const0和PIs来说，它们不存在扇入，因此在这3个列表中对应值均为0即可。
-        # 对于MAJs来说，这三个列表中分别是它的三个扇入nodes在主列表中的索引。
+        # 存储着Nodes的扇入idx。函数值为int，表示在主列表中的索引位置。
+        # 对于const0和PIs来说，它们不存在扇入，因此对应函数值均为0即可。
+        # 对于MAJs来说，这三个Function中分别是它的三个扇入nodes在主列表中的索引。
 
         self._z3_ch0_negated = None
         self._z3_ch1_negated = None
         self._z3_ch2_negated = None
-        # 存储着Nodes的扇入取反属性。元素为bool，表示是否有取反属性。
-        # 对于const0和PIs来说，它们不存在扇入，因此在这3个列表中对应值均为False即可。
-        # 对于MAJs来说，这三个列表中分别是它的三个扇入edge的取反属性。
+        # 存储着Nodes的扇入取反属性。函数值为bool，表示是否有取反属性。
+        # 对于const0和PIs来说，它们不存在扇入，因此对应函数值均为False即可。
+        # 对于MAJs来说，这三个Function中分别是它的三个扇入edge的取反属性。
 
         self._z3_ch0_polymorphic = None
         self._z3_ch1_polymorphic = None
         self._z3_ch2_polymorphic = None
-        # 存储着Nodes的扇入多态属性。元素为bool，表示是否有多态属性。
-        # 对于const0和PIs来说，它们不存在扇入，因此在这3个列表中对应值均为False即可。
-        # 对于MAJs来说，这三个列表中分别是它的三个扇入edge的多态属性。注意：若不允许多态，则列表中所有元素都应为False。
+        # 存储着Nodes的扇入多态属性。函数值为bool，表示是否有多态属性。
+        # 对于const0和PIs来说，它们不存在扇入，因此对应函数值均为False即可。
+        # 对于MAJs来说，这三个Function中分别是它的三个扇入edge的多态属性。注意：若不允许多态，则所有函数值都应为False。
+
+        self._z3_ch0_func1 = None
+        self._z3_ch1_func1 = None
+        self._z3_ch2_func1 = None
+
+        self._z3_ch0_func2 = None
+        self._z3_ch1_func2 = None
+        self._z3_ch2_func2 = None
+        # 存储着Nodes的扇入逻辑值（考虑edge属性)。列表元素为Function。列表索引从0开始，长度为self._n_func，代表输入向量。每个Function的自变量代表着node的索引。
+        # 对于const0和PIs来说，它们不存在扇入，因此在这6个列表中对应值均为False即可。
 
         # Z3 PO
-        self._z3_po_idx = None # int类型，是PO的扇入node在主列表中的idx
-        self._z3_po_negated = None # bool， 表示PO的扇入edge是否取反
-        self._z3_po_polymorphic = None # bool， 表示PO的扇入edge是否多态
-        self._z3_po_func1 = None # 列表，元素为布尔，分别表示PO在不同的输入向量下功能1的逻辑值
-        self._z3_po_func2 = None # 列表，元素为布尔，分别表示PO在不同的输入向量下功能2的逻辑值
+        self._z3_po_idx = None  # 是PO的扇入node在主列表中的idx
+        self._z3_po_negated = None  # 表示PO的扇入edge是否取反
+        self._z3_po_polymorphic = None  # 表示PO的扇入edge是否多态
+
 
     def _check_functions(self):
         '''
@@ -95,8 +104,9 @@ class PMIG_Cut_ExactSynthesis:
         if self._func1 != self._func2:
             assert self._allow_polymorphic
 
+        print('n_PIs = ', numpy.log2(func1_len))
         # 返回PI长度和功能向量长度
-        return numpy.log2(func1_len), func1_len
+        return int(numpy.log2(func1_len)), int(func1_len)
 
     def get_n_pis(self):
         '''
@@ -119,72 +129,94 @@ class PMIG_Cut_ExactSynthesis:
         self._z3_solver = Solver()
 
         # Z3 列表
-        self._z3_nodes_func1 = [ [Bool('NodeFunc1_{}_{}'.format(i, j)) for j in range(0, self._n_func)] for i in range(0, (1 + self.get_n_pis() + n_maj_nodes)) ]
-        self._z3_nodes_func2 = [ [Bool('NodeFunc2_{}_{}'.format(i, j)) for j in range(0, self._n_func)] for i in range(0, (1 + self.get_n_pis() + n_maj_nodes)) ]
-        # Nodes的主列表，二维列表，元素为布尔，表示node的值。外层从索引0开始，依次对应const 0，PIs，以及MAJs。内层从索引0到索引self._n_func，依次对应每个PI向量。
+        self._z3_nodes_func1 = [ Function('NodeFunc1_{}'.format(ii), IntSort(), BoolSort()) for ii in range(0, self._n_func) ]
+        self._z3_nodes_func2 = [ Function('NodeFunc2_{}'.format(ii), IntSort(), BoolSort()) for ii in range(0, self._n_func) ]
+        # Nodes的主列表，列表元素为Function。列表索引从0开始，长度为self._n_func，代表输入向量。每个Function的自变量代表着node的索引。
 
-        self._z3_ch0_idx = IntVector('Ch0_idx', (1 + self.get_n_pis() + n_maj_nodes))
-        self._z3_ch1_idx = IntVector('Ch1_idx', (1 + self.get_n_pis() + n_maj_nodes))
-        self._z3_ch2_idx = IntVector('Ch2_idx', (1 + self.get_n_pis() + n_maj_nodes))
-        # 存储着Nodes的扇入idx。元素为int，表示在主列表中的索引位置。
-        # 对于const0和PIs来说，它们不存在扇入，因此在这3个列表中对应值均为0即可。
-        # 对于MAJs来说，这三个列表中分别是它的三个扇入nodes在主列表中的索引。
+        self._z3_ch0_idx = Function('CH0Idx', IntSort(), IntSort())
+        self._z3_ch1_idx = Function('CH1Idx', IntSort(), IntSort())
+        self._z3_ch2_idx = Function('CH2Idx', IntSort(), IntSort())
+        # 存储着Nodes的扇入idx。函数值为int，表示在主列表中的索引位置。
+        # 对于const0和PIs来说，它们不存在扇入，因此对应函数值均为0即可。
+        # 对于MAJs来说，这三个Function中分别是它的三个扇入nodes在主列表中的索引。
 
-        self._z3_ch0_negated = BoolVector('Ch0_ne', (1 + self.get_n_pis() + n_maj_nodes))
-        self._z3_ch1_negated = BoolVector('Ch1_ne', (1 + self.get_n_pis() + n_maj_nodes))
-        self._z3_ch2_negated = BoolVector('Ch2_ne', (1 + self.get_n_pis() + n_maj_nodes))
-        # 存储着Nodes的扇入取反属性。元素为bool，表示是否有取反属性。
-        # 对于const0和PIs来说，它们不存在扇入，因此在这3个列表中对应值均为False即可。
-        # 对于MAJs来说，这三个列表中分别是它的三个扇入edge的取反属性。
+        self._z3_ch0_negated = Function('CH0AttrNe', IntSort(), BoolSort())
+        self._z3_ch1_negated = Function('CH1AttrNe', IntSort(), BoolSort())
+        self._z3_ch2_negated = Function('CH2AttrNe', IntSort(), BoolSort())
+        # 存储着Nodes的扇入取反属性。函数值为bool，表示是否有取反属性。
+        # 对于const0和PIs来说，它们不存在扇入，因此对应函数值均为False即可。
+        # 对于MAJs来说，这三个Function中分别是它的三个扇入edge的取反属性。
 
-        self._z3_ch0_polymorphic = BoolVector('Ch0_po', (1 + self.get_n_pis() + n_maj_nodes))
-        self._z3_ch1_polymorphic = BoolVector('Ch1_po', (1 + self.get_n_pis() + n_maj_nodes))
-        self._z3_ch2_polymorphic = BoolVector('Ch2_po', (1 + self.get_n_pis() + n_maj_nodes))
-        # 存储着Nodes的扇入多态属性。元素为bool，表示是否有多态属性。
-        # 对于const0和PIs来说，它们不存在扇入，因此在这3个列表中对应值均为False即可。
-        # 对于MAJs来说，这三个列表中分别是它的三个扇入edge的多态属性。注意：若不允许多态，则列表中所有元素都应为False。
+        self._z3_ch0_polymorphic = Function('CH0AttrPo', IntSort(), BoolSort())
+        self._z3_ch1_polymorphic = Function('CH1AttrPo', IntSort(), BoolSort())
+        self._z3_ch2_polymorphic = Function('CH2AttrPo', IntSort(), BoolSort())
+        # 存储着Nodes的扇入多态属性。函数值为bool，表示是否有多态属性。
+        # 对于const0和PIs来说，它们不存在扇入，因此对应函数值均为False即可。
+        # 对于MAJs来说，这三个Function中分别是它的三个扇入edge的多态属性。注意：若不允许多态，则所有函数值都应为False。
+
+        self._z3_ch0_func1 = [Function('CH0Func1_{}'.format(ii), IntSort(), BoolSort()) for ii in
+                                range(0, self._n_func)]
+        self._z3_ch1_func1 = [Function('CH1Func1_{}'.format(ii), IntSort(), BoolSort()) for ii in
+                                range(0, self._n_func)]
+        self._z3_ch2_func1 = [Function('CH2Func1_{}'.format(ii), IntSort(), BoolSort()) for ii in
+                                range(0, self._n_func)]
+
+        self._z3_ch0_func2 = [Function('CH0Func2_{}'.format(ii), IntSort(), BoolSort()) for ii in
+                                range(0, self._n_func)]
+        self._z3_ch1_func2 = [Function('CH1Func2_{}'.format(ii), IntSort(), BoolSort()) for ii in
+                                range(0, self._n_func)]
+        self._z3_ch2_func2 = [Function('CH2Func2_{}'.format(ii), IntSort(), BoolSort()) for ii in
+                                range(0, self._n_func)]
+        # 存储着Nodes的扇入逻辑值（考虑edge属性)。列表元素为Function。列表索引从0开始，长度为self._n_func，代表输入向量。每个Function的自变量代表着node的索引。
+        # 对于const0和PIs来说，它们不存在扇入，因此在这6个列表中对应值均为False即可。
 
         # Z3 PO
-        self._z3_po_idx = Int('PO_idx')  # int类型，是PO的扇入node在主列表中的idx
-        self._z3_po_negated = Bool('PO_ne')  # bool， 表示PO的扇入edge是否取反
-        self._z3_po_polymorphic = Bool('PO_po')  # bool， 表示PO的扇入edge是否多态
-        self._z3_po_func1 = BoolVector('PO_Func1', self._n_func)  # 列表，元素为布尔，分别表示PO在不同的输入向量下功能1的逻辑值
-        self._z3_po_func2 = BoolVector('PO_Func2', self._n_func)  # 列表，元素为布尔，分别表示PO在不同的输入向量下功能2的逻辑值
+        self._z3_po_idx = Int('PO_idx')  # 是PO的扇入node在主列表中的idx
+        self._z3_po_negated = Bool('PO_ne')  # 表示PO的扇入edge是否取反
+        self._z3_po_polymorphic = Bool('PO_po')  # 表示PO的扇入edge是否多态
 
+#######
     def _subtask_constraint_lock_vars(self, n_maj_nodes):
         '''
-        将无用的变量（如PI nodes的扇入）以及具有固定值的变量（比如，不允许多态时，多态edge属性应为False）约束为应有的值。
+        将具有固定值的变量（比如，不允许多态时，多态edge属性应为False）约束为应有的值。
 
         :param n_maj_nodes:
         :return:
         '''
         assert isinstance(self._z3_solver, Solver)
 
-        # const0和PI的扇入
-        for ii in range(0, (1 + self.get_n_pis())):
-            self._z3_solver.add(self._z3_ch0_idx == 0)
-            self._z3_solver.add(self._z3_ch1_idx == 0)
-            self._z3_solver.add(self._z3_ch2_idx == 0)
-
-            self._z3_solver.add(self._z3_ch0_negated == False)
-            self._z3_solver.add(self._z3_ch1_negated == False)
-            self._z3_solver.add(self._z3_ch2_negated == False)
-
-            self._z3_solver.add(self._z3_ch0_polymorphic == False)
-            self._z3_solver.add(self._z3_ch1_polymorphic == False)
-            self._z3_solver.add(self._z3_ch2_polymorphic == False)
-
         # const0
-        for ii in range(0, self._n_func):
-            self._z3_solver.add(self._z3_nodes_func1[0][ii] == False)
-            self._z3_solver.add(self._z3_nodes_func2[0][ii] == False)
+        for ii_f in range(0, self._n_func):
+            self._z3_solver.add(self._z3_nodes_func1[ii_f](0) == False)
+            self._z3_solver.add(self._z3_nodes_func2[ii_f](0) == False)
 
         # polymorphic
         if not self._allow_polymorphic:
             for ii in range(0, (1 + self.get_n_pis() + n_maj_nodes)):
-                self._z3_solver.add(self._z3_ch0_polymorphic == False)
-                self._z3_solver.add(self._z3_ch1_polymorphic == False)
-                self._z3_solver.add(self._z3_ch2_polymorphic == False)
+                self._z3_solver.add(self._z3_ch0_polymorphic(ii) == False)
+                self._z3_solver.add(self._z3_ch1_polymorphic(ii) == False)
+                self._z3_solver.add(self._z3_ch2_polymorphic(ii) == False)
+
+#######
+    def _subtask_constraint_majority_functionality(self, n_maj_nodes):
+        '''
+        MAJ nodes的值与三个扇入nodes值之间的关系。
+
+        对于功能1来说，MAJ node的值为
+
+        :param n_maj_nodes:
+        :return:
+        '''
+        assert isinstance(self._z3_solver, Solver)
+
+        for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
+            self._z3_solver.add(self._z3_ch0_idx(ii) < ii)
+            for ii_f in range(0, self._n_func):
+                # 功能1：MAJ实际的扇入值为扇入node的值附加上取反属性
+                self._z3_solver.add(
+                    self._z3_ch0_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch0_idx(ii)) == self._z3_ch0_negated(ii) )
+                )
+
 
 
 
@@ -207,6 +239,8 @@ class PMIG_Cut_ExactSynthesis:
         self._subtask_create_vars(n_maj_nodes=n_maj_nodes)
         # 约束不可变变量
         self._subtask_constraint_lock_vars(n_maj_nodes=n_maj_nodes)
+
+        self._subtask_constraint_majority_functionality(n_maj_nodes=n_maj_nodes)
 
 
 

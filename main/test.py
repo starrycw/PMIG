@@ -14,6 +14,7 @@ from pmig import graphs
 from pmig import graphs_io
 from pmig import pmig_ops
 from pmig import pmig_logic
+from pmig import exact_synthesis as ex_syn
 
 # Get global variables from global_vars
 echo_mode = g_vars.get_value("echo_mode")
@@ -67,4 +68,8 @@ logicsimu2 = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_1[0])
 
 logicsimu2.print_pis_id(more_info=True)
 
-print(logicsimu2.simu_for_exact_synthesis())
+fvec1, fvec2, is_po = logicsimu2.simu_for_exact_synthesis()
+
+exsyn_obj1 = ex_syn.PMIG_Cut_ExactSynthesis(func1=fvec1, func2=fvec2, allow_polymorphic=is_po)
+exsyn_obj1.create_solver(n_maj_nodes=6)
+
