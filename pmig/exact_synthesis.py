@@ -28,7 +28,7 @@ class PMIG_Cut_ExactSynthesis:
         self._func1 = copy.deepcopy(func1)
         self._func2 = copy.deepcopy(func2)
         self._allow_polymorphic = allow_polymorphic
-        self._n_pis, self._n_func = self._check_functions()
+        self._n_pis, self._n_func = self._check_functions() # 分别为PI nodes的数目，以及PI向量的数目
 
         # Z3 Solver
         self._z3_solver = None
@@ -63,6 +63,8 @@ class PMIG_Cut_ExactSynthesis:
         self._z3_po_idx = None # int类型，是PO的扇入node在主列表中的idx
         self._z3_po_negated = None # bool， 表示PO的扇入edge是否取反
         self._z3_po_polymorphic = None # bool， 表示PO的扇入edge是否多态
+        self._z3_po_func1 = None # 列表，元素为布尔，分别表示PO在不同的输入向量下功能1的逻辑值
+        self._z3_po_func2 = None # 列表，元素为布尔，分别表示PO在不同的输入向量下功能2的逻辑值
 
     def _check_functions(self):
         '''
@@ -135,6 +137,8 @@ class PMIG_Cut_ExactSynthesis:
         self._z3_po_idx = Int('PO_idx')  # int类型，是PO的扇入node在主列表中的idx
         self._z3_po_negated = Bool('PO_ne')  # bool， 表示PO的扇入edge是否取反
         self._z3_po_polymorphic = Bool('PO_po')  # bool， 表示PO的扇入edge是否多态
+        self._z3_po_func1 = BoolVector('PO_Func1', self._n_func)  # 列表，元素为布尔，分别表示PO在不同的输入向量下功能1的逻辑值
+        self._z3_po_func2 = BoolVector('PO_Func2', self._n_func)  # 列表，元素为布尔，分别表示PO在不同的输入向量下功能2的逻辑值
 
     def _subtask_constraint_lock_vars(self, n_maj_nodes):
         '''
