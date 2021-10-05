@@ -13,6 +13,17 @@ from prettytable import PrettyTable
 import copy
 import numpy
 
+########################################################################################################################
+# class PMIG_Cut_ExactSynthesis
+#
+# @Time    : 2021/10
+# @Author  : c
+#
+# PMIG exact synthesis
+#
+#
+#
+########################################################################################################################
 class PMIG_Cut_ExactSynthesis:
     def __init__(self, func1, func2, allow_polymorphic):
         '''
