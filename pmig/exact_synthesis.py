@@ -210,11 +210,50 @@ class PMIG_Cut_ExactSynthesis:
         assert isinstance(self._z3_solver, Solver)
 
         for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
+            # 对于每个MAJ node，其三个扇入nodes的idx都必须具有小于该MAJ node的idx
             self._z3_solver.add(self._z3_ch0_idx(ii) < ii)
+            self._z3_solver.add(self._z3_ch1_idx(ii) < ii)
+            self._z3_solver.add(self._z3_ch2_idx(ii) < ii)
+
+            # MAJ功能
             for ii_f in range(0, self._n_func):
                 # 功能1：MAJ实际的扇入值为扇入node的值附加上取反属性
                 self._z3_solver.add(
                     self._z3_ch0_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch0_idx(ii)) == self._z3_ch0_negated(ii) )
+                )
+                self._z3_solver.add(
+                    self._z3_ch1_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch1_idx(ii)) == self._z3_ch1_negated(ii))
+                )
+                self._z3_solver.add(
+                    self._z3_ch2_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch2_idx(ii)) == self._z3_ch2_negated(ii))
+                )
+                # 功能2：MAJ实际的扇入值为扇入node的值附加上取反属性和多态属性
+                self._z3_solver.add(
+                    self._z3_ch0_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch0_idx(ii)) == (self._z3_ch0_negated(ii) == self._z3_ch0_polymorphic(ii)) )
+                )
+                self._z3_solver.add(
+                    self._z3_ch1_func2[ii_f](ii) == (self._z3_nodes_func2[ii_f](self._z3_ch1_idx(ii)) == (
+                                self._z3_ch1_negated(ii) == self._z3_ch1_polymorphic(ii)))
+                )
+                self._z3_solver.add(
+                    self._z3_ch2_func2[ii_f](ii) == (self._z3_nodes_func2[ii_f](self._z3_ch2_idx(ii)) == (
+                                self._z3_ch2_negated(ii) == self._z3_ch2_polymorphic(ii)))
+                )
+                # 功能1：MAJ的值为三个实际扇入值取多数
+                self._z3_solver.add(
+                    self._z3_nodes_func1[ii_f](ii) == Or(
+                        And( self._z3_ch0_func1[ii_f](ii), self._z3_ch1_func1[ii_f](ii) ),
+                        And( self._z3_ch1_func1[ii_f](ii), self._z3_ch2_func1[ii_f](ii) ),
+                        And( self._z3_ch2_func1[ii_f](ii), self._z3_ch0_func1[ii_f](ii) )
+                    )
+                )
+                # 功能2：MAJ的值为三个实际扇入值取多数
+                self._z3_solver.add(
+                    self._z3_nodes_func2[ii_f](ii) == Or(
+                        And( self._z3_ch0_func2[ii_f](ii), self._z3_ch1_func2[ii_f](ii) ),
+                        And( self._z3_ch1_func2[ii_f](ii), self._z3_ch2_func2[ii_f](ii) ),
+                        And( self._z3_ch2_func2[ii_f](ii), self._z3_ch0_func2[ii_f](ii) )
+                    )
                 )
 
 
