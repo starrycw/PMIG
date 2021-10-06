@@ -42,10 +42,10 @@ print(mf_1)
 print(mf_2)
 print(mf_1 == mf_2)
 
-print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=6))
-print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=6, multi_fanout_nodes_list=mf_2))
+print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=4))
+print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=4, multi_fanout_nodes_list=mf_2))
 
-cut_1 = pmig_ops.PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=6)
+cut_1 = pmig_ops.PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=4)
 print(cut_1)
 
 # logicsimu1 = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=mig_1)

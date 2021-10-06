@@ -27,7 +27,7 @@ import numpy
 class PMIG_Cut_ExactSynthesis:
     def __init__(self, func1, func2, allow_polymorphic):
         '''
-        func1和func2均为元组，元素为0或1,长度相等且应为2的正整数被。
+        func1和func2均为元组，元素为False或True,长度相等且应为2的正整数被。
         allow_polymorphic为bool类型，表示是否允许出现多态属性的edge。
         :param func1:
         :param func2:
@@ -232,12 +232,10 @@ class PMIG_Cut_ExactSynthesis:
                     self._z3_ch0_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch0_idx(ii)) == (self._z3_ch0_negated(ii) == self._z3_ch0_polymorphic(ii)) )
                 )
                 self._z3_solver.add(
-                    self._z3_ch1_func2[ii_f](ii) == (self._z3_nodes_func2[ii_f](self._z3_ch1_idx(ii)) == (
-                                self._z3_ch1_negated(ii) == self._z3_ch1_polymorphic(ii)))
+                    self._z3_ch1_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch1_idx(ii)) == (self._z3_ch1_negated(ii) == self._z3_ch1_polymorphic(ii)) )
                 )
                 self._z3_solver.add(
-                    self._z3_ch2_func2[ii_f](ii) == (self._z3_nodes_func2[ii_f](self._z3_ch2_idx(ii)) == (
-                                self._z3_ch2_negated(ii) == self._z3_ch2_polymorphic(ii)))
+                    self._z3_ch2_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch2_idx(ii)) == (self._z3_ch2_negated(ii) == self._z3_ch2_polymorphic(ii)) )
                 )
                 # 功能1：MAJ的值为三个实际扇入值取多数
                 self._z3_solver.add(
@@ -257,6 +255,46 @@ class PMIG_Cut_ExactSynthesis:
                 )
 
 
+#######
+    def _subtask_constraint_symmetry_breaking(self, n_maj_nodes):
+        '''
+        Symmetry breaking
+
+        :param n_maj_nodes:
+        :return:
+        '''
+        for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
+            # MAJ的三个扇入nodes的idx：ch0 <= ch1 <= ch2。注意由于多态属性的存在，因此允许=。
+            self._z3_solver.add(
+                self._z3_ch0_idx(ii) <= self._z3_ch1_idx(ii)
+            )
+            self._z3_solver.add(
+                self._z3_ch1_idx(ii) <= self._z3_ch2_idx(ii)
+            )
+
+#######
+    def _subtask_constraint_po_function(self, n_maj_nodes):
+        '''
+        PO的逻辑值应当正确
+
+        :param n_maj_nodes:
+        :return:
+        '''
+        # PO的扇入idx应当为实际存在的nodes
+        self._z3_solver.add(
+            self._z3_po_idx < (1 + self.get_n_pis() + n_maj_nodes)
+        )
+        # 功能应当正确
+        for ii_f in range(0, self._n_func):
+            # 功能1,PO输出为PO扇入node附加取反属性
+            self._z3_solver.add(
+                self._func1[ii_f] == ( self._z3_nodes_func1[ii_f](self._z3_po_idx) == self._z3_po_negated )
+            )
+            # 功能2,PO输出为PO扇入node附加取反和多态属性
+            self._z3_solver.add(
+                self._func2[ii_f] == ( self._z3_nodes_func2[ii_f](self._z3_po_idx) == (self._z3_po_negated == self._z3_po_polymorphic) )
+            )
+
 
 
 
@@ -274,12 +312,21 @@ class PMIG_Cut_ExactSynthesis:
         assert isinstance(n_maj_nodes, int)
         assert n_maj_nodes > 0
 
+
         # 重建Solver和变量
         self._subtask_create_vars(n_maj_nodes=n_maj_nodes)
+        assert isinstance(self._z3_solver, Solver)
+        
         # 约束不可变变量
         self._subtask_constraint_lock_vars(n_maj_nodes=n_maj_nodes)
 
         self._subtask_constraint_majority_functionality(n_maj_nodes=n_maj_nodes)
+
+        self._subtask_constraint_symmetry_breaking(n_maj_nodes=n_maj_nodes)
+
+        self._subtask_constraint_po_function(n_maj_nodes=n_maj_nodes)
+
+        print(self._z3_solver.check())
 
 
 
