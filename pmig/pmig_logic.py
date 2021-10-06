@@ -609,22 +609,23 @@ class PMIG_LogicSimu_Comb:
         if_polymorphic = False
         for mixed_value in result_mixed:
             if mixed_value == self.LVALUE_V_00:
-                result_f1.append(0)
-                result_f2.append(0)
+                result_f1.append(False)
+                result_f2.append(False)
             elif mixed_value == self.LVALUE_V_11:
-                result_f1.append(1)
-                result_f2.append(1)
+                result_f1.append(True)
+                result_f2.append(True)
             elif mixed_value == self.LVALUE_V_P01:
-                result_f1.append(0)
-                result_f2.append(1)
+                result_f1.append(False)
+                result_f2.append(True)
                 if_polymorphic = True
             elif mixed_value == self.LVALUE_V_P10:
-                result_f1.append(1)
-                result_f2.append(0)
+                result_f1.append(True)
+                result_f2.append(False)
                 if_polymorphic = True
             else:
                 print(mixed_value)
                 assert False
+
 
         return tuple(copy.deepcopy(result_f1)), tuple(copy.deepcopy(result_f2)), if_polymorphic
 
