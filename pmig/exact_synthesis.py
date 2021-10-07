@@ -282,10 +282,13 @@ class PMIG_Cut_ExactSynthesis:
     def _subtask_constraint_po_function(self, n_maj_nodes):
         '''
         PO的逻辑值应当正确
+        todo:取反属性和多态属性的施加方式错了！
+
 
         :param n_maj_nodes:
         :return:
         '''
+
         # PO的扇入idx应当为实际存在的nodes
         self._z3_solver.add(
             self._z3_po_idx < (1 + self.get_n_pis() + n_maj_nodes)
@@ -309,8 +312,66 @@ class PMIG_Cut_ExactSynthesis:
 
 #######
     def _subtask_constraint_pi_vector(self, n_maj_nodes):
-        # 指定PI输入向量
-        for ii_f in range(0, self._n_func)
+        # 指定PI输入向量。注意：具有最小idx的PI位于MSB！
+        for ii_f in range(0, self._n_func):
+            vec_bin = bin(ii_f)[2:]
+            vec_tuple = tuple(str.zfill(vec_bin, self.get_n_pis()))
+            assert len(vec_tuple) == self.get_n_pis()
+            vec_pis_tuple = vec_tuple # [::-1]
+            assert len(vec_pis_tuple) == self.get_n_pis()
+
+            print(vec_pis_tuple, self.get_n_pis())
+
+            ii_idx = 1  # 别忘了CONST 0
+            for ii_v in vec_pis_tuple:
+                if int(ii_v) == 0:
+                    self._z3_solver.add(
+                        self._z3_nodes_func1[ii_f](ii_idx) == False
+                    )
+                    self._z3_solver.add(
+                        self._z3_nodes_func2[ii_f](ii_idx) == False
+                    )
+                elif int(ii_v) == 1:
+                    self._z3_solver.add(
+                        self._z3_nodes_func1[ii_f](ii_idx) == True
+                    )
+                    self._z3_solver.add(
+                        self._z3_nodes_func2[ii_f](ii_idx) == True
+                    )
+                else:
+                    assert False
+                ii_idx = ii_idx + 1
+            assert ii_idx == 1 + self.get_n_pis()
+
+#######
+    def _subtask_constraint_n_attr(self, n_maj_nodes):
+        '''
+        可选 - 优化edge属性
+
+        1. 禁止MAJ的超过2个扇入edge具有取反属性
+        2. 禁止MAJ的超过2个扇入edge具有多态属性
+
+        :param n_maj_nodes:
+        :return:
+        '''
+
+        for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
+            # 1. 禁止MAJ的超过2个扇入edge具有取反属性
+            self._z3_solver.add(
+                False == Or(
+                    And(self._z3_ch0_negated(ii), self._z3_ch1_negated(ii)),
+                    And(self._z3_ch1_negated(ii), self._z3_ch2_negated(ii)),
+                    And(self._z3_ch2_negated(ii), self._z3_ch0_negated(ii))
+                )
+            )
+            # 2. 禁止MAJ的超过2个扇入edge具有多态属性
+            self._z3_solver.add(
+                False == Or(
+                    And(self._z3_ch0_polymorphic(ii), self._z3_ch1_polymorphic(ii)),
+                    And(self._z3_ch1_polymorphic(ii), self._z3_ch2_polymorphic(ii)),
+                    And(self._z3_ch2_polymorphic(ii), self._z3_ch0_polymorphic(ii))
+                )
+            )
 
 
 #######
@@ -340,11 +401,16 @@ class PMIG_Cut_ExactSynthesis:
 
         self._subtask_constraint_po_function(n_maj_nodes=n_maj_nodes)
 
-        if self._z3_solver.check():
+        self._subtask_constraint_pi_vector(n_maj_nodes=n_maj_nodes)
+
+        self._subtask_constraint_n_attr(n_maj_nodes=n_maj_nodes)
+
+        result = self._z3_solver.check()
+        if result == sat:
             print('sat!')
             return copy.deepcopy(self._z3_solver.model())
         else:
-            print('unsat!')
+            print('unsat!', result)
             return False
 
 

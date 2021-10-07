@@ -511,6 +511,8 @@ class PMIG_LogicSimu_Comb:
         '''
         输入PI逻辑值pi_vec，以及要输出的PO列表。
 
+        注意PI列表中元素对应的PI顺序：[PI_0, PI_1, PI_2, ...]，即列表中首个元素代表的是self._pis_id[0]的值
+
         其中，对于PO列表pos_selected来说，它应当是一个列表或元组，其中每个元素对应一个PO的信息，也为元组，包含4个元素：(po_value, po_fanin, po_type, po_info_tuple)。
         其中po_info_tuple可以储存PO的信息（前两个元素应当分别为id和name）。pos_selected默认为None，即自动获取所有PO。
 
@@ -568,6 +570,8 @@ class PMIG_LogicSimu_Comb:
     def simu_for_exact_synthesis(self):
         '''
         仿真一个单PO、无latch、无buffer的PMIG图的逻辑功能，用于exact synthesis。
+
+        注意：具有最小idx的PI位于MSB！
 
         返回值包括：
         (1) 一个元组，元素依次为PI从全0到全1时PO在模式1下的输出逻辑值。逻辑值仅有0和1两种情况。
