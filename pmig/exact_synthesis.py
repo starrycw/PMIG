@@ -192,6 +192,7 @@ class PMIG_Cut_ExactSynthesis:
 
         # polymorphic
         if not self._allow_polymorphic:
+            self._z3_solver.add(self._z3_po_polymorphic == False)
             for ii in range(0, (1 + self.get_n_pis() + n_maj_nodes)):
                 self._z3_solver.add(self._z3_ch0_polymorphic(ii) == False)
                 self._z3_solver.add(self._z3_ch1_polymorphic(ii) == False)
@@ -214,6 +215,11 @@ class PMIG_Cut_ExactSynthesis:
             self._z3_solver.add(self._z3_ch0_idx(ii) < ii)
             self._z3_solver.add(self._z3_ch1_idx(ii) < ii)
             self._z3_solver.add(self._z3_ch2_idx(ii) < ii)
+
+            # 对于扇入node的idx应当为非负数
+            self._z3_solver.add(self._z3_ch0_idx(ii) >= 0)
+            self._z3_solver.add(self._z3_ch1_idx(ii) >= 0)
+            self._z3_solver.add(self._z3_ch2_idx(ii) >= 0)
 
             # MAJ功能
             for ii_f in range(0, self._n_func):
@@ -284,6 +290,11 @@ class PMIG_Cut_ExactSynthesis:
         self._z3_solver.add(
             self._z3_po_idx < (1 + self.get_n_pis() + n_maj_nodes)
         )
+        # PO的扇入idx只考虑MAJ
+        self._z3_solver.add(
+            self._z3_po_idx >= (1 + self.get_n_pis())
+        )
+
         # 功能应当正确
         for ii_f in range(0, self._n_func):
             # 功能1,PO输出为PO扇入node附加取反属性
@@ -296,7 +307,10 @@ class PMIG_Cut_ExactSynthesis:
             )
 
 
-
+#######
+    def _subtask_constraint_pi_vector(self, n_maj_nodes):
+        # 指定PI输入向量
+        for ii_f in range(0, self._n_func)
 
 
 #######
@@ -316,7 +330,7 @@ class PMIG_Cut_ExactSynthesis:
         # 重建Solver和变量
         self._subtask_create_vars(n_maj_nodes=n_maj_nodes)
         assert isinstance(self._z3_solver, Solver)
-        
+
         # 约束不可变变量
         self._subtask_constraint_lock_vars(n_maj_nodes=n_maj_nodes)
 
@@ -326,7 +340,14 @@ class PMIG_Cut_ExactSynthesis:
 
         self._subtask_constraint_po_function(n_maj_nodes=n_maj_nodes)
 
-        print(self._z3_solver.check())
+        if self._z3_solver.check():
+            print('sat!')
+            return copy.deepcopy(self._z3_solver.model())
+        else:
+            print('unsat!')
+            return False
+
+
 
 
 
