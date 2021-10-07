@@ -225,23 +225,23 @@ class PMIG_Cut_ExactSynthesis:
             for ii_f in range(0, self._n_func):
                 # 功能1：MAJ实际的扇入值为扇入node的值附加上取反属性
                 self._z3_solver.add(
-                    self._z3_ch0_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch0_idx(ii)) == self._z3_ch0_negated(ii) )
+                    self._z3_ch0_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch0_idx(ii)) != self._z3_ch0_negated(ii) )
                 )
                 self._z3_solver.add(
-                    self._z3_ch1_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch1_idx(ii)) == self._z3_ch1_negated(ii))
+                    self._z3_ch1_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch1_idx(ii)) != self._z3_ch1_negated(ii))
                 )
                 self._z3_solver.add(
-                    self._z3_ch2_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch2_idx(ii)) == self._z3_ch2_negated(ii))
+                    self._z3_ch2_func1[ii_f](ii) == ( self._z3_nodes_func1[ii_f](self._z3_ch2_idx(ii)) != self._z3_ch2_negated(ii))
                 )
                 # 功能2：MAJ实际的扇入值为扇入node的值附加上取反属性和多态属性
                 self._z3_solver.add(
-                    self._z3_ch0_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch0_idx(ii)) == (self._z3_ch0_negated(ii) == self._z3_ch0_polymorphic(ii)) )
+                    self._z3_ch0_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch0_idx(ii)) != (self._z3_ch0_negated(ii) != self._z3_ch0_polymorphic(ii)) )
                 )
                 self._z3_solver.add(
-                    self._z3_ch1_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch1_idx(ii)) == (self._z3_ch1_negated(ii) == self._z3_ch1_polymorphic(ii)) )
+                    self._z3_ch1_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch1_idx(ii)) != (self._z3_ch1_negated(ii) != self._z3_ch1_polymorphic(ii)) )
                 )
                 self._z3_solver.add(
-                    self._z3_ch2_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch2_idx(ii)) == (self._z3_ch2_negated(ii) == self._z3_ch2_polymorphic(ii)) )
+                    self._z3_ch2_func2[ii_f](ii) == ( self._z3_nodes_func2[ii_f](self._z3_ch2_idx(ii)) != (self._z3_ch2_negated(ii) != self._z3_ch2_polymorphic(ii)) )
                 )
                 # 功能1：MAJ的值为三个实际扇入值取多数
                 self._z3_solver.add(
@@ -282,8 +282,6 @@ class PMIG_Cut_ExactSynthesis:
     def _subtask_constraint_po_function(self, n_maj_nodes):
         '''
         PO的逻辑值应当正确
-        todo:取反属性和多态属性的施加方式错了！
-
 
         :param n_maj_nodes:
         :return:
@@ -302,11 +300,11 @@ class PMIG_Cut_ExactSynthesis:
         for ii_f in range(0, self._n_func):
             # 功能1,PO输出为PO扇入node附加取反属性
             self._z3_solver.add(
-                self._func1[ii_f] == ( self._z3_nodes_func1[ii_f](self._z3_po_idx) == self._z3_po_negated )
+                self._func1[ii_f] == ( self._z3_nodes_func1[ii_f](self._z3_po_idx) != self._z3_po_negated )
             )
             # 功能2,PO输出为PO扇入node附加取反和多态属性
             self._z3_solver.add(
-                self._func2[ii_f] == ( self._z3_nodes_func2[ii_f](self._z3_po_idx) == (self._z3_po_negated == self._z3_po_polymorphic) )
+                self._func2[ii_f] == ( self._z3_nodes_func2[ii_f](self._z3_po_idx) != (self._z3_po_negated != self._z3_po_polymorphic) )
             )
 
 
