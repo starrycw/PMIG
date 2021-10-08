@@ -353,7 +353,7 @@ class PMIG_Cut_ExactSynthesis:
             vec_pis_tuple = vec_tuple # [::-1]
             assert len(vec_pis_tuple) == self.get_n_pis()
 
-            print(vec_pis_tuple, self.get_n_pis())
+            # print(vec_pis_tuple, self.get_n_pis())
 
             ii_idx = 1  # 别忘了CONST 0
             for ii_v in vec_pis_tuple:
@@ -378,14 +378,95 @@ class PMIG_Cut_ExactSynthesis:
 
 #######
     def _subtask_constraint_for_0maj_case(self, n_maj_nodes):
-        '''
-        0 MAJ case的约束
-
-        :return:
-        '''
-
         assert n_maj_nodes == 0
-        
+
+        #####################
+        ####### create vars
+        #####################
+        # Z3 Solver
+        self._z3_solver = Solver()
+
+        # Z3 列表
+        self._z3_nodes_func1 = [Function('NodeFunc1_{}'.format(ii), IntSort(), BoolSort()) for ii in
+                                range(0, self._n_func)]
+        self._z3_nodes_func2 = [Function('NodeFunc2_{}'.format(ii), IntSort(), BoolSort()) for ii in
+                                range(0, self._n_func)]
+        # Nodes的主列表，列表元素为Function。列表索引从0开始，长度为self._n_func，代表输入向量。每个Function的自变量代表着node的索引。
+
+        # Z3 PO
+        self._z3_po_idx = Int('PO_idx')  # 是PO的扇入node在主列表中的idx
+        self._z3_po_negated = Bool('PO_ne')  # 表示PO的扇入edge是否取反
+        self._z3_po_polymorphic = Bool('PO_po')  # 表示PO的扇入edge是否多态
+
+        #####################
+        ####### lock vars
+        #####################
+        # const0
+        for ii_f in range(0, self._n_func):
+            self._z3_solver.add(self._z3_nodes_func1[ii_f](0) == False)
+            self._z3_solver.add(self._z3_nodes_func2[ii_f](0) == False)
+
+        # polymorphic
+        if not self._allow_polymorphic:
+            self._z3_solver.add(self._z3_po_polymorphic == False)
+
+        #####################
+        ####### po function
+        #####################
+        # PO的扇入idx应当为实际存在的nodes
+        self._z3_solver.add(
+            self._z3_po_idx < (1 + self.get_n_pis())
+        )
+
+        self._z3_solver.add(
+            self._z3_po_idx >= 0
+        )
+
+        # 功能应当正确
+        for ii_f in range(0, self._n_func):
+            # 功能1,PO输出为PO扇入node附加取反属性
+            self._z3_solver.add(
+                self._func1[ii_f] == (self._z3_nodes_func1[ii_f](self._z3_po_idx) != self._z3_po_negated)
+            )
+            # 功能2,PO输出为PO扇入node附加取反和多态属性
+            self._z3_solver.add(
+                self._func2[ii_f] == (self._z3_nodes_func2[ii_f](self._z3_po_idx) != (
+                            self._z3_po_negated != self._z3_po_polymorphic))
+            )
+
+        #####################
+        ####### pi vec
+        #####################
+        # 指定PI输入向量。注意：具有最小idx的PI位于MSB！
+        for ii_f in range(0, self._n_func):
+            vec_bin = bin(ii_f)[2:]
+            vec_tuple = tuple(str.zfill(vec_bin, self.get_n_pis()))
+            assert len(vec_tuple) == self.get_n_pis()
+            vec_pis_tuple = vec_tuple  # [::-1]
+            assert len(vec_pis_tuple) == self.get_n_pis()
+
+            # print(vec_pis_tuple, self.get_n_pis())
+
+            ii_idx = 1  # 别忘了CONST 0
+            for ii_v in vec_pis_tuple:
+                if int(ii_v) == 0:
+                    self._z3_solver.add(
+                        self._z3_nodes_func1[ii_f](ii_idx) == False
+                    )
+                    self._z3_solver.add(
+                        self._z3_nodes_func2[ii_f](ii_idx) == False
+                    )
+                elif int(ii_v) == 1:
+                    self._z3_solver.add(
+                        self._z3_nodes_func1[ii_f](ii_idx) == True
+                    )
+                    self._z3_solver.add(
+                        self._z3_nodes_func2[ii_f](ii_idx) == True
+                    )
+                else:
+                    assert False
+                ii_idx = ii_idx + 1
+            assert ii_idx == 1 + self.get_n_pis()
 
 
 
@@ -427,7 +508,11 @@ class PMIG_Cut_ExactSynthesis:
         else:
             assert n_maj_nodes == 0
 
-            #
+            self._subtask_constraint_for_0maj_case(n_maj_nodes=n_maj_nodes)
+
+            return copy.deepcopy(self._z3_solver)
+
+
 
 
 #######
@@ -490,6 +575,47 @@ class PMIG_Cut_ExactSynthesis:
 
 
         return if_sat, model_nodes_list, model_po
+
+#######
+    def search_minimum_mig(self, upper_limit_n, echo_mode = True):
+        '''
+        main
+
+        :return:
+        '''
+        if echo_mode:
+            print("############################# exact_synthesis/search_minimum_mig #############################")
+            print("##############################################################################################")
+            print("########################################### Func1 ############################################")
+            print(self._func1)
+            print("########################################### Func2 ############################################")
+            print(self._func2)
+            print("##################################### Allow polymorphic ######################################")
+            print(self._allow_polymorphic)
+            print("########################################### START ############################################")
+
+        n_maj_nodes = 0
+        sat_flag = False
+        while( (sat_flag == False) & (n_maj_nodes <= upper_limit_n) ):
+            if echo_mode:
+                print("Constraint: {}-MAJ MIG ......".format(n_maj_nodes))
+            self.create_solver(n_maj_nodes=n_maj_nodes)
+            if_sat, model_nodes_list, model_po = self.check_solver(n_maj_nodes=n_maj_nodes)
+            if if_sat == sat:
+                sat_flag = True
+            if echo_mode:
+                print(sat_flag)
+            n_maj_nodes = n_maj_nodes + 1
+
+        if echo_mode:
+            print("############################################ END #############################################")
+            print('MAJ: ')
+            print(model_nodes_list)
+            print("PO: ")
+            print(model_po)
+            print("##############################################################################################")
+        return sat_flag, model_nodes_list, model_po
+
 
 
 

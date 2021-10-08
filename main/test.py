@@ -72,32 +72,13 @@ fvec1, fvec2, is_po = logicsimu2.simu_for_exact_synthesis()
 print(fvec1)
 print(fvec2)
 
-vvv1 = (False, True, True, True)
-vvv2 = (True, False, False, True)
+vvv1 = (False, True, False, True, True, False, False, True, True, False, False, False, False, True, False, False)
+vvv2 = (False, True, False, True, True, False, False, True, True, False, False, False, False, True, False, False)
 
-exsyn_obj1 = ex_syn.PMIG_Cut_ExactSynthesis(func1=vvv1, func2=vvv2, allow_polymorphic=True)
-mm = exsyn_obj1.create_solver(n_maj_nodes=3)
-if mm != False:
-    print('ch0 idx', mm[exsyn_obj1._z3_ch0_idx])
-    print('ch1 idx', mm[exsyn_obj1._z3_ch1_idx])
-    print('ch2 idx', mm[exsyn_obj1._z3_ch2_idx])
+exsyn_obj1 = ex_syn.PMIG_Cut_ExactSynthesis(func1=vvv1, func2=vvv2, allow_polymorphic=(vvv1 == vvv2))
 
-    print('ch0 ne', mm[exsyn_obj1._z3_ch0_negated])
-    print('ch1 ne', mm[exsyn_obj1._z3_ch1_negated])
-    print('ch2 ne', mm[exsyn_obj1._z3_ch2_negated])
-
-    print( 'ch0 ne--', mm.evaluate(exsyn_obj1._z3_ch0_negated(3)), mm.evaluate(exsyn_obj1._z3_ch0_negated(4)),mm.evaluate(exsyn_obj1._z3_ch0_negated(5)) )
-    print( 'ch1 ne--', mm.evaluate(exsyn_obj1._z3_ch1_negated(3)), mm.evaluate(exsyn_obj1._z3_ch1_negated(4)),mm.evaluate(exsyn_obj1._z3_ch1_negated(5)) )
-    print( 'ch2 ne--', mm.evaluate(exsyn_obj1._z3_ch2_negated(3)), mm.evaluate(exsyn_obj1._z3_ch2_negated(4)), mm.evaluate(exsyn_obj1._z3_ch2_negated(5)) )
-
-    print('ch0 po', mm[exsyn_obj1._z3_ch0_polymorphic])
-    print('ch1 po', mm[exsyn_obj1._z3_ch1_polymorphic])
-    print('ch2 po', mm[exsyn_obj1._z3_ch2_polymorphic])
-
-    print('ch0 po--', mm.evaluate(exsyn_obj1._z3_ch0_polymorphic(3)), mm.evaluate(exsyn_obj1._z3_ch0_polymorphic(4)), mm.evaluate(exsyn_obj1._z3_ch0_polymorphic(5)))
-    print('ch1 po--', mm.evaluate(exsyn_obj1._z3_ch1_polymorphic(3)), mm.evaluate(exsyn_obj1._z3_ch1_polymorphic(4)), mm.evaluate(exsyn_obj1._z3_ch1_polymorphic(5)))
-    print('ch2 po--', mm.evaluate(exsyn_obj1._z3_ch2_polymorphic(3)), mm.evaluate(exsyn_obj1._z3_ch2_polymorphic(4)), mm.evaluate(exsyn_obj1._z3_ch2_polymorphic(5)))
-
-    print('PO idx', mm[exsyn_obj1._z3_po_idx])
-    print('PO ne', mm[exsyn_obj1._z3_po_negated])
-    print('PO po', mm[exsyn_obj1._z3_po_polymorphic])
+ifsat, nlist, polist = exsyn_obj1.search_minimum_mig(upper_limit_n=6)
+print('*****************************************')
+print(ifsat)
+print(nlist)
+print(polist)
