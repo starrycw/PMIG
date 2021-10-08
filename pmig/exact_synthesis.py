@@ -125,6 +125,8 @@ class PMIG_Cut_ExactSynthesis:
         :param n_maj_nodes:
         :return:
         '''
+        assert n_maj_nodes > 0
+
         # Z3 Solver
         self._z3_solver = Solver()
 
@@ -184,6 +186,7 @@ class PMIG_Cut_ExactSynthesis:
         :return:
         '''
         assert isinstance(self._z3_solver, Solver)
+        assert n_maj_nodes > 0
 
         # const0
         for ii_f in range(0, self._n_func):
@@ -208,6 +211,7 @@ class PMIG_Cut_ExactSynthesis:
         :param n_maj_nodes:
         :return:
         '''
+        assert n_maj_nodes > 0
         assert isinstance(self._z3_solver, Solver)
 
         for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
@@ -269,6 +273,9 @@ class PMIG_Cut_ExactSynthesis:
         :param n_maj_nodes:
         :return:
         '''
+
+        assert n_maj_nodes > 0
+
         for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
             # MAJ的三个扇入nodes的idx：ch0 <= ch1 <= ch2。注意由于多态属性的存在，因此允许=。
             self._z3_solver.add(
@@ -278,6 +285,29 @@ class PMIG_Cut_ExactSynthesis:
                 self._z3_ch1_idx(ii) <= self._z3_ch2_idx(ii)
             )
 
+        # 可选 - 优化edge属性
+        #
+        # 1. 禁止MAJ的超过2个扇入edge具有取反属性
+        # 2. 禁止MAJ的超过2个扇入edge具有多态属性
+        for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
+            # 1. 禁止MAJ的超过2个扇入edge具有取反属性
+            self._z3_solver.add(
+                False == Or(
+                    And(self._z3_ch0_negated(ii), self._z3_ch1_negated(ii)),
+                    And(self._z3_ch1_negated(ii), self._z3_ch2_negated(ii)),
+                    And(self._z3_ch2_negated(ii), self._z3_ch0_negated(ii))
+                )
+            )
+            # 2. 禁止MAJ的超过2个扇入edge具有多态属性
+            self._z3_solver.add(
+                False == Or(
+                    And(self._z3_ch0_polymorphic(ii), self._z3_ch1_polymorphic(ii)),
+                    And(self._z3_ch1_polymorphic(ii), self._z3_ch2_polymorphic(ii)),
+                    And(self._z3_ch2_polymorphic(ii), self._z3_ch0_polymorphic(ii))
+                )
+            )
+
+
 #######
     def _subtask_constraint_po_function(self, n_maj_nodes):
         '''
@@ -286,6 +316,8 @@ class PMIG_Cut_ExactSynthesis:
         :param n_maj_nodes:
         :return:
         '''
+
+        assert n_maj_nodes > 0
 
         # PO的扇入idx应当为实际存在的nodes
         self._z3_solver.add(
@@ -310,6 +342,9 @@ class PMIG_Cut_ExactSynthesis:
 
 #######
     def _subtask_constraint_pi_vector(self, n_maj_nodes):
+
+        assert n_maj_nodes > 0
+
         # 指定PI输入向量。注意：具有最小idx的PI位于MSB！
         for ii_f in range(0, self._n_func):
             vec_bin = bin(ii_f)[2:]
@@ -342,34 +377,17 @@ class PMIG_Cut_ExactSynthesis:
             assert ii_idx == 1 + self.get_n_pis()
 
 #######
-    def _subtask_constraint_n_attr(self, n_maj_nodes):
+    def _subtask_constraint_for_0maj_case(self, n_maj_nodes):
         '''
-        可选 - 优化edge属性
+        0 MAJ case的约束
 
-        1. 禁止MAJ的超过2个扇入edge具有取反属性
-        2. 禁止MAJ的超过2个扇入edge具有多态属性
-
-        :param n_maj_nodes:
         :return:
         '''
 
-        for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
-            # 1. 禁止MAJ的超过2个扇入edge具有取反属性
-            self._z3_solver.add(
-                False == Or(
-                    And(self._z3_ch0_negated(ii), self._z3_ch1_negated(ii)),
-                    And(self._z3_ch1_negated(ii), self._z3_ch2_negated(ii)),
-                    And(self._z3_ch2_negated(ii), self._z3_ch0_negated(ii))
-                )
-            )
-            # 2. 禁止MAJ的超过2个扇入edge具有多态属性
-            self._z3_solver.add(
-                False == Or(
-                    And(self._z3_ch0_polymorphic(ii), self._z3_ch1_polymorphic(ii)),
-                    And(self._z3_ch1_polymorphic(ii), self._z3_ch2_polymorphic(ii)),
-                    And(self._z3_ch2_polymorphic(ii), self._z3_ch0_polymorphic(ii))
-                )
-            )
+        assert n_maj_nodes == 0
+        
+
+
 
 
 #######
@@ -381,35 +399,101 @@ class PMIG_Cut_ExactSynthesis:
         :param n_maj_nodes:
         :return:
         '''
-
         assert isinstance(n_maj_nodes, int)
-        assert n_maj_nodes > 0
+        if n_maj_nodes > 0:
+            assert n_maj_nodes > 0
 
+            # 重建Solver和变量
+            self._subtask_create_vars(n_maj_nodes=n_maj_nodes)
+            assert isinstance(self._z3_solver, Solver)
 
-        # 重建Solver和变量
-        self._subtask_create_vars(n_maj_nodes=n_maj_nodes)
-        assert isinstance(self._z3_solver, Solver)
+            # 约束不可变变量
+            self._subtask_constraint_lock_vars(n_maj_nodes=n_maj_nodes)
 
-        # 约束不可变变量
-        self._subtask_constraint_lock_vars(n_maj_nodes=n_maj_nodes)
+            # MAJ功能
+            self._subtask_constraint_majority_functionality(n_maj_nodes=n_maj_nodes)
 
-        self._subtask_constraint_majority_functionality(n_maj_nodes=n_maj_nodes)
+            # Symmetry breaking
+            self._subtask_constraint_symmetry_breaking(n_maj_nodes=n_maj_nodes)
 
-        self._subtask_constraint_symmetry_breaking(n_maj_nodes=n_maj_nodes)
+            # PO功能
+            self._subtask_constraint_po_function(n_maj_nodes=n_maj_nodes)
 
-        self._subtask_constraint_po_function(n_maj_nodes=n_maj_nodes)
+            # 设置PI输入向量
+            self._subtask_constraint_pi_vector(n_maj_nodes=n_maj_nodes)
 
-        self._subtask_constraint_pi_vector(n_maj_nodes=n_maj_nodes)
+            return copy.deepcopy(self._z3_solver)
 
-        self._subtask_constraint_n_attr(n_maj_nodes=n_maj_nodes)
-
-        result = self._z3_solver.check()
-        if result == sat:
-            print('sat!')
-            return copy.deepcopy(self._z3_solver.model())
         else:
-            print('unsat!', result)
-            return False
+            assert n_maj_nodes == 0
+
+            #
+
+
+#######
+    def check_solver(self, n_maj_nodes):
+        '''
+        求解solver。
+
+        return if_sat, model_nodes_list, model_po
+
+        if_sat: 即solver.check()的返回值
+
+        model_nodes_list：若非sat，则为None。若sat，则为[
+                                                        ( (M1-ch0 idx, M1-ch0 ne, M1-ch0 po), (M1-ch1 idx, M1-ch1 ne, M1-ch1 po), (M1-ch2 idx, M1-ch2 ne, M1-ch2 po) ),
+                                                        ( (M2-ch0 idx, M2-ch0 ne, M2-ch0 po), (M2-ch1 idx, M2-ch1 ne, M2-ch1 po), (M2-ch2 idx, M2-ch2 ne, M2-ch2 po) ),
+                                                        ......
+                                                    ]
+
+        model_po：若非sat，则为None。若sat，则为 (po_idx, po_ne, po_po)
+
+        :return:
+        '''
+
+        assert isinstance(self._z3_solver, Solver)
+        if_sat = self._z3_solver.check()
+
+        if if_sat == sat:
+            z3_model = self._z3_solver.model()
+
+            # MAJ nodes
+            # model_nodes = [
+            #                   ( (M1-ch0 idx, M1-ch0 ne, M1-ch0 po), (M1-ch1 idx, M1-ch1 ne, M1-ch1 po), (M1-ch2 idx, M1-ch2 ne, M1-ch2 po) ),
+            #                   ( (M2-ch0 idx, M2-ch0 ne, M2-ch0 po), (M2-ch1 idx, M2-ch1 ne, M2-ch1 po), (M2-ch2 idx, M2-ch2 ne, M2-ch2 po) ),
+            #                   ......
+            #                   ]
+            model_nodes_list = []
+            for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
+                # ch0
+                tuple_node_ch0 = ( z3_model.evaluate(self._z3_ch0_idx(ii)), z3_model.evaluate(self._z3_ch0_negated(ii)), z3_model.evaluate(self._z3_ch0_polymorphic(ii)) )
+
+                # ch1
+                tuple_node_ch1 = ( z3_model.evaluate(self._z3_ch1_idx(ii)), z3_model.evaluate(self._z3_ch1_negated(ii)), z3_model.evaluate(self._z3_ch1_polymorphic(ii)) )
+
+                # ch2
+                tuple_node_ch2 = ( z3_model.evaluate(self._z3_ch2_idx(ii)), z3_model.evaluate(self._z3_ch2_negated(ii)), z3_model.evaluate(self._z3_ch2_polymorphic(ii)) )
+
+                tuple_node_3chs = ( copy.deepcopy(tuple_node_ch0), copy.deepcopy(tuple_node_ch1), copy.deepcopy(tuple_node_ch2) )
+                model_nodes_list.append(copy.deepcopy(tuple_node_3chs))
+
+
+            # PO
+            po_fanin_idx = z3_model.evaluate(self._z3_po_idx)
+            po_fanin_ne = z3_model.evaluate(self._z3_po_negated)
+            po_fanin_po = z3_model.evaluate(self._z3_po_polymorphic)
+
+            model_po = (copy.deepcopy(po_fanin_idx), copy.deepcopy(po_fanin_ne), copy.deepcopy(po_fanin_po))
+
+        else:
+            model_nodes_list = None
+            model_po = None
+
+
+        return if_sat, model_nodes_list, model_po
+
+
+
+
 
 
 
