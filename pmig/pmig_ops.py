@@ -125,7 +125,7 @@ class PMIG_operator:
 
         # main
         nodeset_leaves = [root_l, PMIG.get_literal_const0()]
-        nodeset_visited = [root_l]
+        nodeset_visited = [root_l, PMIG.get_literal_const0()]
         stop_list = tuple(stop_list)
         return construct_cut_rec(nodeset_leaves=nodeset_leaves, nodeset_visited=nodeset_visited, size_limit=n,
                                  stop_list=stop_list)
@@ -357,6 +357,8 @@ class PMIG_operator:
         # Get n-cut
         nodeset_leaves, nodeset_visited = PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=pmig_obj_r, root_l=root_l, n=n, multi_fanout_nodes_list=multifanout_list)
         nodeset_cone = pmig_obj_r.get_cone(roots=(root_l,), stop=nodeset_leaves)
+        print("#####", nodeset_visited)
+        print("#####", nodeset_leaves)
         # checks
         for i in nodeset_visited:
             assert (i in nodeset_leaves) or (i in nodeset_cone)
@@ -400,27 +402,54 @@ class PMIG_operator:
         return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited
 
     @staticmethod
-    def op_cut_exact_synthesis(pmig_obj_r, root_l, n_leaves, opti_target = 'size'):
-        if opti_target == 'size':
-            cut_pmig_obj = PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
-            assert isinstance(cut_pmig_obj, PMIG)
-            pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_pmig_obj)
-            func1, func2, pflag = pmigsimu_obj.simu_for_exact_synthesis()
-            exsyn_obj = exact_synthesis.PMIG_Cut_ExactSynthesis(func1=func1, func2=func2, allow_polymorphic=pflag)
-            sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs())
-            if sat_flag:
-                # 功能验证
-                new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
-                new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
-                assert new_func1 == func1
-                assert new_func2 == func2
-            else:
-                new_pmig = None
+    def op_cut_exact_synthesis_size(pmig_obj_r, root_l, n_leaves):
+        '''
+        在pmig_obj_r中，以literal为root_l的node为root，获得一个n_leaves割集，然后对该割集进行exact synthesis
 
-            return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(model_nodes_list), copy.deepcopy(model_po)
+        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(model_nodes_list), copy.deepcopy(model_po)
+
+        :param pmig_obj_r:
+        :param root_l:
+        :param n_leaves:
+        :param opti_target:
+        :return:
+        '''
+        assert isinstance(pmig_obj_r, PMIG)
+
+        # 获得cut
+        cut_pmig_obj, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited = PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
+        assert isinstance(cut_pmig_obj, PMIG)
+        # 获得cut功能
+        pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_pmig_obj)
+        func1, func2, pflag = pmigsimu_obj.simu_for_exact_synthesis()
+        # exact synthesis
+        exsyn_obj = exact_synthesis.PMIG_Cut_ExactSynthesis(func1=func1, func2=func2, allow_polymorphic=pflag)
+        sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs())
+
+        # 应用优化后的cut
+        if sat_flag:
+            # 功能验证
+            new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
+            new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
+            assert new_func1 == func1
+            assert new_func2 == func2
+
+            # 应用
+            optimized_mig_obj = PMIG(name=pmig_obj_r.attr_get_pmig_name(), polymorphic_type=pmig_obj_r.attr_ptype_get())
+            list_nodes_to_be_deleted = []
+            for ii_l in nodeset_visited:
+                if ii_l not in nodeset_leaves:
+                    list_nodes_to_be_deleted.append(ii_l)
+
+
+
 
         else:
-            assert False
+            new_pmig = None
+
+        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(model_nodes_list), copy.deepcopy(model_po), copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves), copy.deepcopy(nodeset_visited)
+
+
 
 
 

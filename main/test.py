@@ -45,9 +45,13 @@ print(mf_1 == mf_2)
 # print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=4))
 # print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=4, multi_fanout_nodes_list=mf_2))
 
-cut_1 = pmig_ops.PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=800, n=6)
+cut_1, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited  = pmig_ops.PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=820, n=6)
 print("CUT:", cut_1)
-
+print("CUT MAP PI", cut_map_pi)
+print("CUT MAP PO", cut_map_po)
+print("LEAVES", nodeset_leaves)
+print("VISITED", nodeset_visited)
+assert False
 # logicsimu1 = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=mig_1)
 #
 # logicsimu1.print_pis_id(more_info=True)
