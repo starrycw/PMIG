@@ -407,13 +407,17 @@ class PMIG_operator:
             pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_pmig_obj)
             func1, func2, pflag = pmigsimu_obj.simu_for_exact_synthesis()
             exsyn_obj = exact_synthesis.PMIG_Cut_ExactSynthesis(func1=func1, func2=func2, allow_polymorphic=pflag)
-            sat_flag, model_nodes_list, model_po = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs())
+            sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs())
             if sat_flag:
-                pass
+                # 功能验证
+                new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
+                new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
+                assert new_func1 == func1
+                assert new_func2 == func2
             else:
                 new_pmig = None
 
-            return sat_flag, new_pmig
+            return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(model_nodes_list), copy.deepcopy(model_po)
 
         else:
             assert False
