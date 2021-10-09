@@ -401,6 +401,8 @@ class PMIG_operator:
         # return
         return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited
 
+
+
     @staticmethod
     def op_cut_exact_synthesis_size(pmig_obj_r, root_l, n_leaves):
         '''
@@ -411,9 +413,54 @@ class PMIG_operator:
         :param pmig_obj_r:
         :param root_l:
         :param n_leaves:
-        :param opti_target:
         :return:
         '''
+        ####################################class
+        class Map_for_ApplyOptiCut:
+            '''
+            用于将PMIG的cut替换为优化后的cut
+            '''
+            def __init__(self, deleted_literal, map_cut_pi):
+                self._dict_literal_old_to_new = {PMIG.get_literal_const0():PMIG.get_literal_const0()}
+                self._dict_literal_cut_to_old = copy.deepcopy(map_cut_pi)
+                self._dict_literal_cut_to_new = {}
+                self._deleted_literal = copy.deepcopy(deleted_literal)
+
+
+
+            def map_literal_old_to_new(self, l_old, l_new):
+                assert PMIG.is_noattribute_literal(f=l_old)
+                assert l_old not in self._dict_literal_old_to_new
+                assert l_old not in self._deleted_literal
+                self._dict_literal_old_to_new[l_old] = l_new
+
+            def get_new_literal_of_old(self, l_old):
+                l_old_noattr = PMIG.get_noattribute_literal(f=l_old)
+                assert l_old_noattr in self._dict_literal_old_to_new
+                assert l_old_noattr not in self._deleted_literal
+                l_new_noattr = self._dict_literal_old_to_new[l_old_noattr]
+                l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_old)
+                return l_new
+
+            def map_literal_cut_to_new(self, l_cut, l_new):
+                assert PMIG.is_noattribute_literal(f=l_cut)
+                assert l_cut not in self._dict_literal_cut_to_new
+                self._dict_literal_cut_to_new[l_cut] = l_new
+
+            def get_new_literal_of_cut(self, l_cut):
+                l_cut_noattr = PMIG.get_noattribute_literal(f=l_cut)
+                if l_cut_noattr in self._dict_literal_cut_to_old:
+                    l_old_noattr = self._dict_literal_cut_to_old[l_cut_noattr]
+                    l_old = PMIG.add_attr_if_has_attr(f=l_old_noattr, c=l_cut)
+                    return self.get_new_literal_of_old(l_old=l_old)
+                else:
+                    assert l_cut_noattr in self._dict_literal_cut_to_new
+                    l_new_noattr = self._dict_literal_cut_to_new[l_cut_noattr]
+                    l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_cut)
+                    return l_new
+
+
+        ####################################main
         assert isinstance(pmig_obj_r, PMIG)
 
         # 获得cut
@@ -431,23 +478,84 @@ class PMIG_operator:
             # 功能验证
             new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
             new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
+            print(new_func1)
+            print(func1)
             assert new_func1 == func1
             assert new_func2 == func2
 
             # 应用
             optimized_mig_obj = PMIG(name=pmig_obj_r.attr_get_pmig_name(), polymorphic_type=pmig_obj_r.attr_ptype_get())
+            # 原图中可被直接删除的nodes，即割集中除去root和leaves以外的其它所有nodes。
             list_nodes_to_be_deleted = []
             for ii_l in nodeset_visited:
-                if ii_l not in nodeset_leaves:
+                if (ii_l not in nodeset_leaves) and (ii_l != root_l):
                     list_nodes_to_be_deleted.append(ii_l)
 
+            # literal映射字典
+            map_dict = Map_for_ApplyOptiCut(deleted_literal=list_nodes_to_be_deleted, map_cut_pi=cut_map_pi)
+
+            # cut po在原图中的literal，即root_l
+            po_literal_old = cut_map_po[1]
+
+            # 开始映射
+            for ii_l in pmig_obj_r.get_iter_nodes_all():
+                if pmig_obj_r.has_name(f=ii_l):
+                    newnode_name = pmig_obj_r.get_name_by_id(f=ii_l)
+                else:
+                    newnode_name = None
+
+                if pmig_obj_r.is_const0(f=ii_l):
+                    assert ii_l == PMIG.get_literal_const0()
+
+                elif pmig_obj_r.is_pi(f=ii_l):
+                    newnode_l = optimized_mig_obj.create_pi(name=newnode_name)
+                    map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
+
+                elif ii_l == po_literal_old:
+                    for ii_cut_l in new_pmig:
+                        if new_pmig.is_maj(f=ii_cut_l):
+                            ch0_l_cut = new_pmig.get_maj_child0(f=ii_cut_l)
+                            ch1_l_cut = new_pmig.get_maj_child1(f=ii_cut_l)
+                            ch2_l_cut = new_pmig.get_maj_child2(f=ii_cut_l)
+
+                            ch0_l_new = map_dict.get_new_literal_of_cut(l_cut=ch0_l_cut)
+                            ch1_l_new = map_dict.get_new_literal_of_cut(l_cut=ch1_l_cut)
+                            ch2_l_new = map_dict.get_new_literal_of_cut(l_cut=ch2_l_cut)
+
+                            newnode_l = optimized_mig_obj.create_maj(child0=ch0_l_new, child1=ch1_l_new, child2=ch2_l_new)
+                            map_dict.map_literal_cut_to_new(l_cut=ii_cut_l, l_new=newnode_l)
+                        else:
+                            assert (new_pmig.is_const0(f=ii_cut_l)) or (new_pmig.is_pi(f=ii_cut_l))
+
+                    assert ii_cut_l == cut_map_po[0]
+                    map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
 
 
+
+                elif pmig_obj_r.is_maj(f=ii_l):
+                    if ii_l not in list_nodes_to_be_deleted:
+                        ch0_l_old = pmig_obj_r.get_maj_child0(f=ii_l)
+                        ch1_l_old = pmig_obj_r.get_maj_child1(f=ii_l)
+                        ch2_l_old = pmig_obj_r.get_maj_child2(f=ii_l)
+
+                        ch0_l_new = map_dict.get_new_literal_of_old(l_old=ch0_l_old)
+                        ch1_l_new = map_dict.get_new_literal_of_old(l_old=ch1_l_old)
+                        ch2_l_new = map_dict.get_new_literal_of_old(l_old=ch2_l_old)
+
+                        newnode_l = optimized_mig_obj.create_maj(child0=ch0_l_new, child1=ch1_l_new, child2=ch2_l_new)
+                        map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
+                        if newnode_name != None:
+                            optimized_mig_obj.set_name(f=newnode_l, name=newnode_name)
+                else:
+                    assert False
 
         else:
             new_pmig = None
+            optimized_mig_obj = None
 
-        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(model_nodes_list), copy.deepcopy(model_po), copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves), copy.deepcopy(nodeset_visited)
+        info_tuple_model = ( copy.deepcopy(model_nodes_list), copy.deepcopy(model_po) )
+        info_tuple_cut = ( copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves), copy.deepcopy(nodeset_visited) )
+        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(optimized_mig_obj), info_tuple_cut, info_tuple_model
 
 
 

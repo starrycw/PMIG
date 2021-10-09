@@ -36,22 +36,25 @@ aig_1.fill_po_names()
 mig_1 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_1)
 print(mig_1)
 
-mf_1 = pmig_ops.PMIG_operator.op_get_all_nodes_with_multiple_fanouts(pmig_obj_r=copy.deepcopy(mig_1))
-mf_2 = pmig_ops.PMIG_operator.op_get_all_nodes_with_multiple_fanouts_fast(pmig_obj_r=copy.deepcopy(mig_1))
-print(mf_1)
-print(mf_2)
-print(mf_1 == mf_2)
+for root_l in range(1000, 800, -4):
+    pmig_ops.PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=copy.deepcopy(mig_1), root_l=root_l, n_leaves=4)
+
+# mf_1 = pmig_ops.PMIG_operator.op_get_all_nodes_with_multiple_fanouts(pmig_obj_r=copy.deepcopy(mig_1))
+# mf_2 = pmig_ops.PMIG_operator.op_get_all_nodes_with_multiple_fanouts_fast(pmig_obj_r=copy.deepcopy(mig_1))
+# print(mf_1)
+# print(mf_2)
+# print(mf_1 == mf_2)
 
 # print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=4))
 # print(pmig_ops.PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=64, n=4, multi_fanout_nodes_list=mf_2))
 
-cut_1, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited  = pmig_ops.PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=820, n=6)
-print("CUT:", cut_1)
-print("CUT MAP PI", cut_map_pi)
-print("CUT MAP PO", cut_map_po)
-print("LEAVES", nodeset_leaves)
-print("VISITED", nodeset_visited)
-assert False
+# cut_1, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited  = pmig_ops.PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(mig_1), root_l=1000, n=6)
+# print("CUT:", cut_1)
+# print("CUT MAP PI", cut_map_pi)
+# print("CUT MAP PO", cut_map_po)
+# print("LEAVES", nodeset_leaves)
+# print("VISITED", nodeset_visited)
+# assert False
 # logicsimu1 = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=mig_1)
 #
 # logicsimu1.print_pis_id(more_info=True)
@@ -68,22 +71,22 @@ assert False
 # LV_1X = pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_P1X
 # print(logicsimu1.simu_pos_value(pi_vec=[LV_10, LV_11, LV_10, LV_11]))
 
-logicsimu2 = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_1[0])
-
-logicsimu2.print_pis_id(more_info=True)
-
-fvec1, fvec2, is_po = logicsimu2.simu_for_exact_synthesis()
-print(fvec1)
-print(fvec2)
-
-vvv1 = (False, True, False, True, True, False, False, True, True, False, False, True, False, True, False, False)
-vvv2 = (False, True, False, True, True, False, False, True, True, False, False, True, False, True, False, False)
-
-exsyn_obj1 = ex_syn.PMIG_Cut_ExactSynthesis(func1=vvv1, func2=vvv2, allow_polymorphic=(vvv1 == vvv2))
-
-ifsat, nlist, polist, new_obj = exsyn_obj1.search_minimum_mig(upper_limit_n=6)
-print('*****************************************')
-print(ifsat)
-print(nlist)
-print(polist)
-print(new_obj)
+# logicsimu2 = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_1[0])
+#
+# logicsimu2.print_pis_id(more_info=True)
+#
+# fvec1, fvec2, is_po = logicsimu2.simu_for_exact_synthesis()
+# print(fvec1)
+# print(fvec2)
+#
+# vvv1 = (False, True, False, True, True, False, False, True, True, False, False, True, False, True, False, False)
+# vvv2 = (False, True, False, True, True, False, False, True, True, False, False, True, False, True, False, False)
+#
+# exsyn_obj1 = ex_syn.PMIG_Cut_ExactSynthesis(func1=vvv1, func2=vvv2, allow_polymorphic=(vvv1 == vvv2))
+#
+# ifsat, nlist, polist, new_obj = exsyn_obj1.search_minimum_mig(upper_limit_n=6)
+# print('*****************************************')
+# print(ifsat)
+# print(nlist)
+# print(polist)
+# print(new_obj)
