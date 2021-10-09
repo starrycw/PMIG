@@ -104,7 +104,7 @@ class PMIG_Cut_ExactSynthesis:
         if self._func1 != self._func2:
             assert self._allow_polymorphic
 
-        print('n_PIs = ', numpy.log2(func1_len))
+        # print('n_PIs = ', numpy.log2(func1_len))
         # 返回PI长度和功能向量长度
         return int(numpy.log2(func1_len)), int(func1_len)
 
@@ -626,7 +626,7 @@ class PMIG_Cut_ExactSynthesis:
         assert isinstance(n_pi_nodes, int)
         assert n_pi_nodes > 0
         new_mig_obj = PMIG()
-        map_literal = {PMIG.get_literal_const0():PMIG.get_literal_const_1_0()} # idx映射字典
+        map_literal = {PMIG.get_literal_const0():PMIG.get_literal_const0()} # idx映射字典
         # PIs
         for ii in range(0, n_pi_nodes):
             pi_l = new_mig_obj.create_pi()
@@ -671,9 +671,11 @@ class PMIG_Cut_ExactSynthesis:
                 ch2_l = ch2_l + 2
 
             # create MAJ
+            # print("++++++++++",ch0_l, ch1_l, ch2_l )
             maj_l = new_mig_obj.create_maj(child0=ch0_l, child1=ch1_l, child2=ch2_l)
             assert (cnt_idx << 2) not in map_literal
             map_literal[(cnt_idx << 2)] = maj_l
+            # print("===", cnt_idx, maj_l)
 
             cnt_idx = cnt_idx + 1
 
@@ -689,6 +691,10 @@ class PMIG_Cut_ExactSynthesis:
         if po_po:
             po_fanin_l = po_fanin_l + 2
         po_l = new_mig_obj.create_po(f=po_fanin_l)
+
+        # print("+++++++++++")
+        # for majiii in new_mig_obj.get_iter_majs():
+        #     print(majiii)
 
         return copy.deepcopy(new_mig_obj)
 

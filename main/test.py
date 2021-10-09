@@ -26,7 +26,7 @@ path_aiger_dir = g_vars.get_value("path_aiger_dir")
 # path_abc_srcfile = "rca2.v"
 path_abc_srcfile = "ripple_64.blif"
 
-status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", "rewrite"), echo_mode)
+status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", ), echo_mode)
 print(status, warnings)
 
 aig_1 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
@@ -36,8 +36,15 @@ aig_1.fill_po_names()
 mig_1 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_1)
 print(mig_1)
 
-for root_l in range(1000, 800, -4):
-    pmig_ops.PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=copy.deepcopy(mig_1), root_l=root_l, n_leaves=4)
+path_abc_srcdir = g_vars.get_value("path_srcdir")
+mig_reader = graphs_io.pmig_reader()
+mig_read = mig_reader.read_pmig(file_path=path_abc_srcdir + '/' + 'mig_pedge.pmig')
+
+# mig_read = mig_1
+
+for root_l in range( ((mig_read.n_nodes() - 1) << 2), ((mig_read.n_pis()) << 2), -4):
+    print(root_l)
+    pmig_ops.PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=copy.deepcopy(mig_read), root_l=root_l, n_leaves=4)
 
 # mf_1 = pmig_ops.PMIG_operator.op_get_all_nodes_with_multiple_fanouts(pmig_obj_r=copy.deepcopy(mig_1))
 # mf_2 = pmig_ops.PMIG_operator.op_get_all_nodes_with_multiple_fanouts_fast(pmig_obj_r=copy.deepcopy(mig_1))

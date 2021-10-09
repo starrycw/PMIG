@@ -262,7 +262,7 @@ class PMIG_operator:
                 mfn_llist = mfn[1]
                 if ((mfn_l in nodeset_visited) and (mfn_l not in nodeset_leaves)):
                     for mfn_llist_i in mfn_llist:
-                        if mfn_llist_i not in nodeset_visited:
+                        if (mfn_llist_i not in nodeset_visited) or (mfn_llist_i in nodeset_leaves):
                             if_satisfied = False
                             n = n + 1
                             if ((mfn_llist_i > leaves_max) and (mfn_l not in return_literals)):
@@ -354,11 +354,12 @@ class PMIG_operator:
 
         assert isinstance(pmig_obj_r, PMIG)
         multifanout_list = PMIG_operator.op_get_all_nodes_with_multiple_fanouts_fast(pmig_obj_r=pmig_obj_r)
+        # print("*-*-*-*-*-*", multifanout_list)
         # Get n-cut
         nodeset_leaves, nodeset_visited = PMIG_operator.op_reconvergence_driven_cut_computation_with_multifanout_checks(pmig_obj_r=pmig_obj_r, root_l=root_l, n=n, multi_fanout_nodes_list=multifanout_list)
         nodeset_cone = pmig_obj_r.get_cone(roots=(root_l,), stop=nodeset_leaves)
-        print("#####", nodeset_visited)
-        print("#####", nodeset_leaves)
+        # print("#####", nodeset_visited)
+        # print("#####", nodeset_leaves)
         # checks
         for i in nodeset_visited:
             assert (i in nodeset_leaves) or (i in nodeset_cone)
@@ -466,20 +467,29 @@ class PMIG_operator:
         # 获得cut
         cut_pmig_obj, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited = PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
         assert isinstance(cut_pmig_obj, PMIG)
+        # 若cut大小为0,则直接返回
+        if cut_pmig_obj.n_majs() == 0:
+            return False, None, None, None, None
+
+        # print("**********")
+        # print(nodeset_leaves)
+        # print(nodeset_visited)
         # 获得cut功能
         pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_pmig_obj)
         func1, func2, pflag = pmigsimu_obj.simu_for_exact_synthesis()
         # exact synthesis
         exsyn_obj = exact_synthesis.PMIG_Cut_ExactSynthesis(func1=func1, func2=func2, allow_polymorphic=pflag)
-        sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs())
+        sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs() - 1, echo_mode=False)
 
         # 应用优化后的cut
         if sat_flag:
+            # print
+            print("发现可优化的割集：root = {}, 原割集大小 = {}, 优化后的割集大小 = {}".format(root_l, cut_pmig_obj.n_majs(), new_pmig.n_majs()))
             # 功能验证
             new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
             new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
-            print(new_func1)
-            print(func1)
+            # print(new_func1)
+            # print(func1)
             assert new_func1 == func1
             assert new_func2 == func2
 
@@ -490,7 +500,7 @@ class PMIG_operator:
             for ii_l in nodeset_visited:
                 if (ii_l not in nodeset_leaves) and (ii_l != root_l):
                     list_nodes_to_be_deleted.append(ii_l)
-
+            # print(list_nodes_to_be_deleted,"***")
             # literal映射字典
             map_dict = Map_for_ApplyOptiCut(deleted_literal=list_nodes_to_be_deleted, map_cut_pi=cut_map_pi)
 
@@ -512,7 +522,7 @@ class PMIG_operator:
                     map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
 
                 elif ii_l == po_literal_old:
-                    for ii_cut_l in new_pmig:
+                    for ii_cut_l in new_pmig.get_iter_nodes_all():
                         if new_pmig.is_maj(f=ii_cut_l):
                             ch0_l_cut = new_pmig.get_maj_child0(f=ii_cut_l)
                             ch1_l_cut = new_pmig.get_maj_child1(f=ii_cut_l)
@@ -527,18 +537,21 @@ class PMIG_operator:
                         else:
                             assert (new_pmig.is_const0(f=ii_cut_l)) or (new_pmig.is_pi(f=ii_cut_l))
 
-                    assert ii_cut_l == cut_map_po[0]
+                    # assert ii_cut_l == cut_map_po[0]
+                    assert ii_cut_l == PMIG.get_noattribute_literal( new_pmig.get_po_fanin(po=0) )
+
                     map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
 
 
 
                 elif pmig_obj_r.is_maj(f=ii_l):
-                    if ii_l not in list_nodes_to_be_deleted:
+                    if (ii_l not in list_nodes_to_be_deleted) and (ii_l != po_literal_old):
                         ch0_l_old = pmig_obj_r.get_maj_child0(f=ii_l)
                         ch1_l_old = pmig_obj_r.get_maj_child1(f=ii_l)
                         ch2_l_old = pmig_obj_r.get_maj_child2(f=ii_l)
 
                         ch0_l_new = map_dict.get_new_literal_of_old(l_old=ch0_l_old)
+                        # print(ch1_l_old)
                         ch1_l_new = map_dict.get_new_literal_of_old(l_old=ch1_l_old)
                         ch2_l_new = map_dict.get_new_literal_of_old(l_old=ch2_l_old)
 
