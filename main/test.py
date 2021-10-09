@@ -72,13 +72,14 @@ fvec1, fvec2, is_po = logicsimu2.simu_for_exact_synthesis()
 print(fvec1)
 print(fvec2)
 
-vvv1 = (False, True, False, True, True, False, False, True, True, False, False, False, False, True, False, False)
-vvv2 = (False, True, False, True, True, False, False, True, True, False, False, False, False, True, False, False)
+vvv1 = (False, True, False, True, True, False, False, True, True, False, False, True, False, True, False, False)
+vvv2 = (False, True, False, True, True, False, False, True, True, False, False, True, False, True, False, False)
 
 exsyn_obj1 = ex_syn.PMIG_Cut_ExactSynthesis(func1=vvv1, func2=vvv2, allow_polymorphic=(vvv1 == vvv2))
 
-ifsat, nlist, polist = exsyn_obj1.search_minimum_mig(upper_limit_n=6)
+ifsat, nlist, polist, new_obj = exsyn_obj1.search_minimum_mig(upper_limit_n=6)
 print('*****************************************')
 print(ifsat)
 print(nlist)
 print(polist)
+print(new_obj)

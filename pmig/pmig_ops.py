@@ -7,6 +7,8 @@
 
 ####### import
 from pmig import graphs
+from pmig import exact_synthesis
+from pmig import pmig_logic
 PMIG = graphs.PMIG # alias
 
 from prettytable import PrettyTable
@@ -396,6 +398,26 @@ class PMIG_operator:
 
         # return
         return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited
+
+    @staticmethod
+    def op_cut_exact_synthesis(pmig_obj_r, root_l, n_leaves, opti_target = 'size'):
+        if opti_target == 'size':
+            cut_pmig_obj = PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
+            assert isinstance(cut_pmig_obj, PMIG)
+            pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_pmig_obj)
+            func1, func2, pflag = pmigsimu_obj.simu_for_exact_synthesis()
+            exsyn_obj = exact_synthesis.PMIG_Cut_ExactSynthesis(func1=func1, func2=func2, allow_polymorphic=pflag)
+            sat_flag, model_nodes_list, model_po = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs())
+            if sat_flag:
+                pass
+            else:
+                new_pmig = None
+
+            return sat_flag, new_pmig
+
+        else:
+            assert False
+
 
 
 

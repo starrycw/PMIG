@@ -550,20 +550,20 @@ class PMIG_Cut_ExactSynthesis:
             model_nodes_list = []
             for ii in range((1 + self.get_n_pis()), (1 + self.get_n_pis() + n_maj_nodes)):
                 # ch0
-                tuple_node_ch0 = ( z3_model.evaluate(self._z3_ch0_idx(ii)), z3_model.evaluate(self._z3_ch0_negated(ii)), z3_model.evaluate(self._z3_ch0_polymorphic(ii)) )
+                tuple_node_ch0 = ( (z3_model.evaluate(self._z3_ch0_idx(ii))).as_long(), z3_model.evaluate(self._z3_ch0_negated(ii)), z3_model.evaluate(self._z3_ch0_polymorphic(ii)) )
 
                 # ch1
-                tuple_node_ch1 = ( z3_model.evaluate(self._z3_ch1_idx(ii)), z3_model.evaluate(self._z3_ch1_negated(ii)), z3_model.evaluate(self._z3_ch1_polymorphic(ii)) )
+                tuple_node_ch1 = ( (z3_model.evaluate(self._z3_ch1_idx(ii))).as_long(), z3_model.evaluate(self._z3_ch1_negated(ii)), z3_model.evaluate(self._z3_ch1_polymorphic(ii)) )
 
                 # ch2
-                tuple_node_ch2 = ( z3_model.evaluate(self._z3_ch2_idx(ii)), z3_model.evaluate(self._z3_ch2_negated(ii)), z3_model.evaluate(self._z3_ch2_polymorphic(ii)) )
+                tuple_node_ch2 = ( (z3_model.evaluate(self._z3_ch2_idx(ii))).as_long(), z3_model.evaluate(self._z3_ch2_negated(ii)), z3_model.evaluate(self._z3_ch2_polymorphic(ii)) )
 
                 tuple_node_3chs = ( copy.deepcopy(tuple_node_ch0), copy.deepcopy(tuple_node_ch1), copy.deepcopy(tuple_node_ch2) )
                 model_nodes_list.append(copy.deepcopy(tuple_node_3chs))
 
 
             # PO
-            po_fanin_idx = z3_model.evaluate(self._z3_po_idx)
+            po_fanin_idx = (z3_model.evaluate(self._z3_po_idx)).as_long()
             po_fanin_ne = z3_model.evaluate(self._z3_po_negated)
             po_fanin_po = z3_model.evaluate(self._z3_po_polymorphic)
 
@@ -614,7 +614,90 @@ class PMIG_Cut_ExactSynthesis:
             print("PO: ")
             print(model_po)
             print("##############################################################################################")
-        return sat_flag, model_nodes_list, model_po
+
+        new_pmig_obj = None
+        if sat_flag:
+            new_pmig_obj = PMIG_Cut_ExactSynthesis.construct_from_z3_model_list(n_pi_nodes=self.get_n_pis(), model_nodes_list=copy.deepcopy(model_nodes_list), model_po=copy.deepcopy(model_po))
+        return sat_flag, model_nodes_list, model_po, new_pmig_obj
+
+#######
+    @staticmethod
+    def construct_from_z3_model_list(n_pi_nodes, model_nodes_list, model_po):
+        assert isinstance(n_pi_nodes, int)
+        assert n_pi_nodes > 0
+        new_mig_obj = PMIG()
+        map_literal = {PMIG.get_literal_const0():PMIG.get_literal_const_1_0()} # idx映射字典
+        # PIs
+        for ii in range(0, n_pi_nodes):
+            pi_l = new_mig_obj.create_pi()
+            assert ii == (pi_l >> 2) - 1
+            map_literal[pi_l] = pi_l
+
+        # MAJ
+        cnt_idx = n_pi_nodes + 1
+        for ii_maj in model_nodes_list:
+            ch0_tuple = ii_maj[0] # (idx, ne, po)
+            ch1_tuple = ii_maj[1]
+            ch2_tuple = ii_maj[2]
+
+            # ch0 literal
+            ch0_idx_old = ch0_tuple[0]
+            ch0_l_old = ch0_idx_old << 2
+            assert ch0_l_old in map_literal
+            ch0_l = map_literal[ch0_l_old]
+            if ch0_tuple[1]:
+                ch0_l = ch0_l + 1
+            if ch0_tuple[2]:
+                ch0_l = ch0_l + 2
+
+            # ch1 literal
+            ch1_idx_old = ch1_tuple[0]
+            ch1_l_old = ch1_idx_old << 2
+            assert ch1_l_old in map_literal
+            ch1_l = map_literal[ch1_l_old]
+            if ch1_tuple[1]:
+                ch1_l = ch1_l + 1
+            if ch1_tuple[2]:
+                ch1_l = ch1_l + 2
+
+            # ch2 literal
+            ch2_idx_old = ch2_tuple[0]
+            ch2_l_old = ch2_idx_old << 2
+            assert ch2_l_old in map_literal
+            ch2_l = map_literal[ch2_l_old]
+            if ch2_tuple[1]:
+                ch2_l = ch2_l + 1
+            if ch2_tuple[2]:
+                ch2_l = ch2_l + 2
+
+            # create MAJ
+            maj_l = new_mig_obj.create_maj(child0=ch0_l, child1=ch1_l, child2=ch2_l)
+            assert (cnt_idx << 2) not in map_literal
+            map_literal[(cnt_idx << 2)] = maj_l
+
+            cnt_idx = cnt_idx + 1
+
+        assert cnt_idx == 1 + n_pi_nodes + len(model_nodes_list)
+
+        # PO
+        po_idx_old, po_ne, po_po = model_po
+        po_fanin_l_old = po_idx_old << 2
+        assert po_fanin_l_old in map_literal
+        po_fanin_l = map_literal[po_fanin_l_old]
+        if po_ne:
+            po_fanin_l = po_fanin_l + 1
+        if po_po:
+            po_fanin_l = po_fanin_l + 2
+        po_l = new_mig_obj.create_po(f=po_fanin_l)
+
+        return copy.deepcopy(new_mig_obj)
+
+
+
+
+
+
+
 
 
 
