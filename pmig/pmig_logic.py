@@ -3,6 +3,7 @@
 # @Time    : 2021/10/03
 # @Author  : c
 # @File    : pmig_logic.py
+import random
 
 from pmig import graphs
 # AIG = graphs.AIG # alias
@@ -149,6 +150,11 @@ class PMIG_LogicSimu_Comb:
                 table_pis.add_row([id, 'PI', '{} ({})'.format(literal, i), pi_name])
                 id = id + 1
             print(table_pis)
+
+
+#######
+    def get_pis_len(self):
+        return len(self._pis_id)
 
 #######
     def change_pis_order(self, input_list, mode):

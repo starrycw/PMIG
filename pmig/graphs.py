@@ -698,6 +698,15 @@ class PMIG:
         '''
         return ((po_id, po_fanin, po_type) for po_id, po_fanin, po_type in self.get_iter_pos() if po_type == i_type)
 
+    def get_iter_pos_except_specified_type(self, i_type):
+        '''
+        Return iterator of POs: (po_id: Order in self._pos, po_fanin: Fan-in literal, po_type != i_type: PO type).
+
+        :param i_type:
+        :return: ITERATOR: TUPLE - (po_id, po_fanin, po_type == i_type)
+        '''
+        return ((po_id, po_fanin, po_type) for po_id, po_fanin, po_type in self.get_iter_pos() if po_type != i_type)
+
     def get_iter_pos_by_fanin(self, i_fanin):
         '''
         Return iterator of POs: (po_id: Order in self._pos, po_fanin == i_fanin: Fan-in literal, po_type: PO type).
@@ -709,7 +718,7 @@ class PMIG:
 
     def get_iter_po_fanins(self):
         '''
-        Return iterator of fan-ins (positive and non-polymorphic literals) of PO
+        Return iterator of fan-ins (literals) of PO
 
         :return: ITERATOR: INT - Literal
         '''

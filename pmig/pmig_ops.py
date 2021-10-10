@@ -6,6 +6,8 @@
 
 
 ####### import
+import random
+
 from pmig import graphs
 from pmig import exact_synthesis
 from pmig import pmig_logic
@@ -292,6 +294,13 @@ class PMIG_operator:
             if i > 0:
                 stop_list_current.append(mfn_l)
 
+        # 作为PO扇入的node不可被优化
+        for ii_po_l in pmig_obj_r.get_iter_po_fanins():
+            ii_po_l_noattr = PMIG.get_noattribute_literal(f=ii_po_l)
+            if ii_po_l_noattr not in stop_list_current:
+                stop_list_current.append(ii_po_l_noattr)
+
+
         if_satisfied = False
         while (not if_satisfied):
             nodeset_leaves, nodeset_visited = PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=pmig_obj_r,
@@ -409,7 +418,21 @@ class PMIG_operator:
         '''
         在pmig_obj_r中，以literal为root_l的node为root，获得一个n_leaves割集，然后对该割集进行exact synthesis
 
-        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(model_nodes_list), copy.deepcopy(model_po)
+        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(optimized_mig_obj), n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model
+
+        sat_flag: bool - 是否可优化
+
+        new_pmig: PMIG - 优化后的割集PMIG
+
+        optimized_mig_obj: PMIG - 对割集进行优化后的图
+
+        n_maj_compare: tuple - (优化前割集的MAJ数目, 优化后割集的MAJ数目)
+
+        new_literal_of_root: int - 割集root在新图中的literal（含属性）
+
+        info_tuple_cut:
+
+        info_tuple_model:
 
         :param pmig_obj_r:
         :param root_l:
@@ -469,7 +492,7 @@ class PMIG_operator:
         assert isinstance(cut_pmig_obj, PMIG)
         # 若cut大小为0,则直接返回
         if cut_pmig_obj.n_majs() == 0:
-            return False, None, None, None, None
+            return False, None, None, None, None, None, None
 
         # print("**********")
         # print(nodeset_leaves)
@@ -484,7 +507,8 @@ class PMIG_operator:
         # 应用优化后的cut
         if sat_flag:
             # print
-            print("发现可优化的割集：root = {}, 原割集大小 = {}, 优化后的割集大小 = {}".format(root_l, cut_pmig_obj.n_majs(), new_pmig.n_majs()))
+            # print("发现可优化的割集：root = {}, 原割集大小 = {}, 优化后的割集大小 = {}".format(root_l, cut_pmig_obj.n_majs(), new_pmig.n_majs()))
+            n_maj_compare = (cut_pmig_obj.n_majs(), new_pmig.n_majs())
             # 功能验证
             new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
             new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
@@ -540,7 +564,14 @@ class PMIG_operator:
                     # assert ii_cut_l == cut_map_po[0]
                     assert ii_cut_l == PMIG.get_noattribute_literal( new_pmig.get_po_fanin(po=0) )
 
-                    map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
+                    newnode_l_withattr = newnode_l
+                    if model_po[1]:
+                        newnode_l_withattr = newnode_l_withattr + 1
+                    if model_po[2]:
+                        newnode_l_withattr = newnode_l_withattr + 2
+
+                    map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l_withattr)
+                    new_literal_of_root = newnode_l_withattr
 
 
 
@@ -562,13 +593,25 @@ class PMIG_operator:
                 else:
                     assert False
 
+            for ii_po_id, ii_po_fanin, ii_po_type in pmig_obj_r.get_iter_pos():
+                # print(ii_po_fanin)
+                # print(map_dict._dict_literal_old_to_new)
+                new_po_fanin = map_dict.get_new_literal_of_old(l_old=ii_po_fanin)
+                new_po_name = pmig_obj_r.get_name_by_po(po=ii_po_id)
+                optimized_mig_obj.create_po(f=new_po_fanin, name = new_po_name, po_type=ii_po_type)
+
+
         else:
             new_pmig = None
             optimized_mig_obj = None
+            n_maj_compare = 0
+            new_literal_of_root = None
+            info_tuple_cut = None
+            info_tuple_model = None
 
         info_tuple_model = ( copy.deepcopy(model_nodes_list), copy.deepcopy(model_po) )
         info_tuple_cut = ( copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves), copy.deepcopy(nodeset_visited) )
-        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(optimized_mig_obj), info_tuple_cut, info_tuple_model
+        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(optimized_mig_obj), n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model
 
 
 
@@ -597,28 +640,187 @@ class PMIG_optimization:
         self._pmig_current = None # 当前的PMIG
         self._pmig_last = None  # 前一个PMIG
         self._pmig_savepoint_dict = {} # 字典，用于存档PMIG，key为存档名称,value为PMIG类型对象
+        self._n_random_veri_default = None
 
-    def initialization(self, mig_obj):
+    def initialization(self, mig_obj, n_random_veri = 10):
+        '''
+        初始化
+
+        n_random_veri指定默认的随机功能验证次数
+
+        :param mig_obj:
+        :param n_random_veri:
+        :return:
+        '''
         assert isinstance(mig_obj, PMIG)
         self._pmig_init = copy.deepcopy(mig_obj)
         self._ptype = self._pmig_init.attr_ptype_get()
         self._pmig_current = copy.deepcopy(mig_obj)
-        self._pmig_last = None
+        self._pmig_last = copy.deepcopy(mig_obj)
         self._pmig_savepoint_dict = {}
+        assert isinstance(n_random_veri, int)
+        assert n_random_veri >= 0
+        self._n_random_veri_default = n_random_veri
+
+#######
+    def _function_verification_random(self, n_random_veri = None):
+        '''
+        随机的生成PI向量，用于比较当前的current pmig 和 last pmig的功能。
+
+        随机次数可以指定，也可以使用默认值（initialization()方法指定）。
+
+        :param n_random_veri:
+        :return:
+        '''
+        if n_random_veri == None:
+            n_random_veri = self._n_random_veri_default
+        assert isinstance(n_random_veri, int)
+        assert n_random_veri >= 0
+
+        simu_obj_current = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=self.get_current_pmig())
+        simu_obj_last = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=self.get_last_pmig())
+        # simu_obj_init = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=self.get_init_pmig())
+        pi_len = simu_obj_current.get_pis_len()
+        # assert pi_len == simu_obj_init.get_pis_len()
+        assert pi_len == simu_obj_last.get_pis_len()
+
+        for ii_random in range(0, n_random_veri):
+            vec_max = pow(2, pi_len)
+            vec_value = random.randint(0, vec_max)
+            vec_bin = bin(vec_value)[2:]
+            vec_tuple = tuple(str.zfill(vec_bin, pi_len))
+            # print(len(vec_tuple), pi_len, latch_len)
+            assert len(vec_tuple) == pi_len
+            vec_pi_tuple = vec_tuple[:pi_len]
+            pi_vec = []
+            for i in vec_pi_tuple:
+                if int(i) == 0:
+                    pi_vec.append(pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_00)
+                elif int(i) == 1:
+                    pi_vec.append(pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_11)
+                else:
+                    assert False
+
+            result_pos_value_simple_1, result_pos_value_1, pos_selected_1, pi_vec_1 = simu_obj_current.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
+            result_pos_value_simple_2, result_pos_value_2, pos_selected_2, pi_vec_2 = simu_obj_last.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
+            # result_pos_value_simple_3, result_pos_value_3, pos_selected_3, pi_vec_3 = simu_obj_init.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
+
+            print(result_pos_value_simple_1)
+            print(result_pos_value_simple_2)
+            # print(result_pos_value_simple_3)
+
+            if result_pos_value_simple_1 != result_pos_value_simple_2:
+                print("Random Verification failed!")
+                print(result_pos_value_simple_1)
+                print(result_pos_value_simple_2)
+                return False
+            # if result_pos_value_simple_1 != result_pos_value_simple_3:
+            #     return False
+
+        print("Random Verification x{} passed!".format(n_random_veri))
+        return True
+
+#######
+    def _function_verification_random_for_delete_obsoleted_pos(self, n_random_veri = None):
+        '''
+        随机的生成PI向量，用于在清除OBSOLETE POs后比较current pmig 和 此前的last pmig的功能。
+
+        随机次数可以指定，也可以使用默认值（initialization()方法指定）。
+
+        :param n_random_veri:
+        :return:
+        '''
+        if n_random_veri == None:
+            n_random_veri = self._n_random_veri_default
+        assert isinstance(n_random_veri, int)
+        assert n_random_veri >= 0
+
+        simu_obj_current = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=self.get_current_pmig())
+        simu_obj_last = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=self.get_last_pmig())
+        # simu_obj_init = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=self.get_init_pmig())
+        pi_len = simu_obj_current.get_pis_len()
+        # assert pi_len == simu_obj_init.get_pis_len()
+        assert pi_len == simu_obj_last.get_pis_len()
+
+        pos_last_without_obsolete_pos = []
+        for ii_last_po_id, ii_last_po_fanin, ii_last_po_type in self.get_last_pmig().get_iter_pos_except_specified_type(i_type=PMIG.PO_OBSOLETE):
+            ii_last_po_name = self.get_last_pmig().get_name_by_po_if_has(ii_last_po_id)
+            pos_last_without_obsolete_pos.append((ii_last_po_fanin, ii_last_po_type, (ii_last_po_id, ii_last_po_name)))
+
+        for ii_random in range(0, n_random_veri):
+            vec_max = pow(2, pi_len)
+            vec_value = random.randint(0, vec_max)
+            vec_bin = bin(vec_value)[2:]
+            vec_tuple = tuple(str.zfill(vec_bin, pi_len))
+            # print(len(vec_tuple), pi_len, latch_len)
+            assert len(vec_tuple) == pi_len
+            vec_pi_tuple = vec_tuple[:pi_len]
+            pi_vec = []
+            for i in vec_pi_tuple:
+                if int(i) == 0:
+                    pi_vec.append(pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_00)
+                elif int(i) == 1:
+                    pi_vec.append(pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_11)
+                else:
+                    assert False
+
+            result_pos_value_simple_1, result_pos_value_1, pos_selected_1, pi_vec_1 = simu_obj_current.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
+            result_pos_value_simple_2, result_pos_value_2, pos_selected_2, pi_vec_2 = simu_obj_last.simu_pos_value(pi_vec=pi_vec, pos_selected=pos_last_without_obsolete_pos, allow_node_with_fixed_value=False)
+            # result_pos_value_simple_3, result_pos_value_3, pos_selected_3, pi_vec_3 = simu_obj_init.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
+
+            print(result_pos_value_simple_1)
+            print(result_pos_value_simple_2)
+            # print(result_pos_value_simple_3)
+
+            if result_pos_value_simple_1 != result_pos_value_simple_2:
+                print("Delete OBSOLETE POs - Random Verification failed!")
+                print(result_pos_value_simple_1)
+                print(result_pos_value_simple_2)
+                return False
+            # if result_pos_value_simple_1 != result_pos_value_simple_3:
+            #     return False
+
+        print("Delete OBSOLETE POs - Random Verification x{} passed!".format(n_random_veri))
+        return True
 
 
-    def update_current_pmig(self, new_pmig):
+
+#######
+    def update_current_pmig(self, new_pmig, random_veri = True):
         assert isinstance(new_pmig, PMIG)
         self._pmig_last = copy.deepcopy(self._pmig_current)
         self._pmig_current = copy.deepcopy(new_pmig)
 
+        if random_veri:
+            assert self._function_verification_random(n_random_veri=self._n_random_veri_default)
 
+        print("Update current PMIG:")
+        print("######################## OLD ########################")
+        print(self._pmig_last)
+        print("######################## NEW ########################")
+        print(self._pmig_current)
+
+#######
+    def get_current_pmig(self):
+        return copy.deepcopy(self._pmig_current)
+
+#######
+    def get_last_pmig(self):
+        return copy.deepcopy(self._pmig_last)
+
+#######
+    def get_init_pmig(self):
+        return copy.deepcopy(self._pmig_init)
+
+
+#######
     def savepoint_restore_to_the_last_pmig(self):
         print("Current PMIG is restored to the last version!")
         self._pmig_current = copy.deepcopy(self._pmig_last)
         self._pmig_last = None
 
 
+#######
     def savepoint_save_current_pmig(self, name):
         assert isinstance(name, str)
         if name in self._pmig_savepoint_dict:
@@ -627,27 +829,31 @@ class PMIG_optimization:
             print("Save current PMIG obj to savepoint. The obj in key [" + name + "] is replaced!")
         self._pmig_savepoint_dict[name] = copy.deepcopy(self._pmig_current)
 
+#######
     def savepoint_get_pmig(self, name):
         assert name in self._pmig_savepoint_dict
         return copy.deepcopy(self._pmig_savepoint_dict[name])
 
+#######
     def savepoint_restore_pmig(self, name):
         assert name in self._pmig_savepoint_dict
         print("Current PMIG is restored to the version named as [" + name + "] !")
         # self._pmig_last = copy.deepcopy(self._pmig_current)
         # self._pmig_current = copy.deepcopy(self._pmig_savepoint_dict[name])
-        self.update_current_pmig(new_pmig=self._pmig_savepoint_dict[name])
+        self.update_current_pmig(new_pmig=self._pmig_savepoint_dict[name], random_veri=False)
 
+#######
     def savepoint_delete_pmig(self, name):
         # assert name in self._pmig_savepoint_dict
         print("Remove key [" + name + '] in the savepoint!')
         self._pmig_savepoint_dict.pop(key=name)
 
+#######
     def savepoint_delete_all(self):
         print("Savepoint initialized!")
         self._pmig_savepoint_dict = {}
 
-
+#######
     def opti_clean_pos_by_type(self, po_type_tuple = (PMIG.PO_OBSOLETE, )):
         '''
         清除某些类型的POs， 并清除多余的nodes。
@@ -657,8 +863,11 @@ class PMIG_optimization:
         '''
         assert isinstance(self._pmig_current, PMIG)
         new_pmig = self._pmig_current.pmig_clean_pos_by_type(po_type_tuple=po_type_tuple)
-        self.update_current_pmig(new_pmig=new_pmig)
+        self.update_current_pmig(new_pmig=new_pmig, random_veri=False)
+        if po_type_tuple == (PMIG.PO_OBSOLETE, ):
+            self._function_verification_random_for_delete_obsoleted_pos(n_random_veri=self._n_random_veri_default)
 
+#######
     def opti_clean_irrelevant_nodes(self, pos = None):
         '''
         指定POs列表（指定id），清除与这些POs无关的node。
@@ -668,7 +877,47 @@ class PMIG_optimization:
         '''
         assert isinstance(self._pmig_current, PMIG)
         new_pmig = self._pmig_current.pmig_clean_irrelevant_nodes(pos=pos)
-        self.update_current_pmig(new_pmig=new_pmig)
+        if pos == None:
+            random_veri = True
+        else:
+            random_veri = False
+        self.update_current_pmig(new_pmig=new_pmig, random_veri=random_veri)
+
+#######
+    def opti_exact_synthesis_size_frompo(self, n_leaves):
+        '''
+        从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
+
+        :param n_leaves:
+        :return:
+        '''
+        print(">>> opti_exact_synthesis_size_frompo")
+        flag_continue = True
+        current_pmig_obj = self.get_current_pmig()
+        assert isinstance(current_pmig_obj, PMIG)
+        cnt_round = 1
+        while flag_continue:
+            print("ROUND {}".format(cnt_round))
+            flag_continue = False
+            maj_list = list(current_pmig_obj.get_iter_majs())
+            last_optimized_root_l = None # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
+            for ii_maj_l in maj_list[::-1]:
+                if (last_optimized_root_l == None) or ( (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l) ):
+                    # print("Node {}".format(ii_maj_l))
+                    sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+                        = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l, n_leaves=n_leaves)
+                    if sat_flag:
+                        flag_continue = True
+                        last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+                        current_pmig_obj = optimized_mig_obj
+                        print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l, n_maj_compare[0], n_maj_compare[1]))
+
+            cnt_round = cnt_round + 1
+
+        self.update_current_pmig(new_pmig=current_pmig_obj)
+
+
+
 
 
 

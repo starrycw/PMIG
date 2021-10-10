@@ -16,13 +16,14 @@ from pmig import graphs_polymorphic
 
 # Get global variables from global_vars
 echo_mode = g_vars.get_value("echo_mode")
-path_abc_srcdir = g_vars.get_value("path_srcdir")
+path_abc_srcdir = g_vars.get_value("path_srcdir") + '/91'
 print(path_abc_srcdir)
 path_aiger_dir = g_vars.get_value("path_aiger_dir")
 
 # Set Variables
-path_abc_srcfile = "rca2.v"
+#path_abc_srcfile = "rca2.v"
 #path_abc_srcfile = "ripple_64.blif"
+path_abc_srcfile = "cht.blif"
 
 status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", "rewrite"), echo_mode)
 print(status, warnings)
@@ -36,7 +37,7 @@ print(mig_1)
 
 
 # Set Variables
-path_abc_srcfile = "rca2_inv.v"
+path_abc_srcfile = "apex7.blif"
 #path_abc_srcfile = "ripple_64.blif"
 
 status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", "rewrite"), echo_mode)
