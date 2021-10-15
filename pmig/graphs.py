@@ -427,10 +427,18 @@ class PMIG:
 
 ####### __repr__
     def __repr__(self):
-        return "#PMIG obj: \n Name: {} \n {} PIs, {} POs, {} MAJs, {} latches \n Polymorphic type: {} \n {} nodes have polymorphic edges \n " \
-               "{} nodes have polymorphic PIs (const 0/1 or const 1/0) \n {} POs has polymorphic fanin.".format\
-            ( self._name, self.n_pis(), self.n_pos(), self.n_majs(), self.n_latches(), \
-             self.attr_ptype_get(), self.n_nodes_with_polymorphic_edge(), self.n_nodes_with_polymorphic_pi(), self.n_pos_with_polymorphic_edge() )
+        repr_info_header = '# [PMIG obj] {'
+        repr_info_header2 = '  {'
+        repr_info_name = '       Name: {}'.format(self._name)
+        repr_info_nodes = '       {} PIs, {} POs, {} MAJs, {} latches'.format(self.n_pis(), self.n_pos(), self.n_majs(), self.n_latches())
+        repr_info_ptype = '       Polymorphic type: {}'.format(self.attr_ptype_get())
+        repr_info_pedge = '       {} nodes have polymorphic fanin edge(s)'.format(self.n_nodes_with_polymorphic_edge())
+        repr_info_pconst = '       {} nodes take const 0/1 or const 1/0 as fanin(s)'.format(self.n_nodes_with_polymorphic_pi())
+        repr_info_ppo = '       {} POs has polymorphic fanin edge(s)'.format(self.n_pos_with_polymorphic_edge())
+        repr_info_end = '  }'
+
+        repr_info_all = repr_info_header + '\n' + repr_info_name + '\n' + repr_info_nodes + '\n' + repr_info_ptype + '\n' + repr_info_pedge + '\n' + repr_info_pconst + '\n' + repr_info_ppo + '\n' + repr_info_end
+        return repr_info_all
     # self._polymorphic_flag
 
 ####### __len__

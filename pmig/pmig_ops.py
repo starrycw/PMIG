@@ -705,8 +705,8 @@ class PMIG_optimization:
             result_pos_value_simple_2, result_pos_value_2, pos_selected_2, pi_vec_2 = simu_obj_last.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
             # result_pos_value_simple_3, result_pos_value_3, pos_selected_3, pi_vec_3 = simu_obj_init.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
 
-            print(result_pos_value_simple_1)
-            print(result_pos_value_simple_2)
+            # print(result_pos_value_simple_1)
+            # print(result_pos_value_simple_2)
             # print(result_pos_value_simple_3)
 
             if result_pos_value_simple_1 != result_pos_value_simple_2:
@@ -768,8 +768,8 @@ class PMIG_optimization:
             result_pos_value_simple_2, result_pos_value_2, pos_selected_2, pi_vec_2 = simu_obj_last.simu_pos_value(pi_vec=pi_vec, pos_selected=pos_last_without_obsolete_pos, allow_node_with_fixed_value=False)
             # result_pos_value_simple_3, result_pos_value_3, pos_selected_3, pi_vec_3 = simu_obj_init.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
 
-            print(result_pos_value_simple_1)
-            print(result_pos_value_simple_2)
+            # print(result_pos_value_simple_1)
+            # print(result_pos_value_simple_2)
             # print(result_pos_value_simple_3)
 
             if result_pos_value_simple_1 != result_pos_value_simple_2:
@@ -794,11 +794,14 @@ class PMIG_optimization:
         if random_veri:
             assert self._function_verification_random(n_random_veri=self._n_random_veri_default)
 
-        print("Update current PMIG:")
-        print("######################## OLD ########################")
+        print("---------------------")
+        print("Update _pmig_current")
         print(self._pmig_last)
-        print("######################## NEW ########################")
+        print("------->")
         print(self._pmig_current)
+        print("---------------------")
+
+
 
 #######
     def get_current_pmig(self):
@@ -861,6 +864,9 @@ class PMIG_optimization:
         :param po_type_tuple: TUPLE - POs类型元组，默认包含PMIG.PO_OBSOLETE.
         :return:
         '''
+        # print('\n')
+        print('>>> [PMIG_optimization] opti_clean_pos_by_type')
+        # print('\n')
         assert isinstance(self._pmig_current, PMIG)
         new_pmig = self._pmig_current.pmig_clean_pos_by_type(po_type_tuple=po_type_tuple)
         self.update_current_pmig(new_pmig=new_pmig, random_veri=False)
@@ -875,6 +881,9 @@ class PMIG_optimization:
         :param pos: None (Default) or LIST - POs列表，默认包含当前全部POs.
         :return:
         '''
+        # print('\n')
+        print('>>> [PMIG_optimization] opti_clean_irrelevant_nodes')
+        # print('\n')
         assert isinstance(self._pmig_current, PMIG)
         new_pmig = self._pmig_current.pmig_clean_irrelevant_nodes(pos=pos)
         if pos == None:
@@ -891,7 +900,9 @@ class PMIG_optimization:
         :param n_leaves:
         :return:
         '''
-        print(">>> opti_exact_synthesis_size_frompo")
+        # print('\n')
+        print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompo")
+
         flag_continue = True
         current_pmig_obj = self.get_current_pmig()
         assert isinstance(current_pmig_obj, PMIG)
@@ -913,7 +924,6 @@ class PMIG_optimization:
                         print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l, n_maj_compare[0], n_maj_compare[1]))
 
             cnt_round = cnt_round + 1
-
         self.update_current_pmig(new_pmig=current_pmig_obj)
 
 
