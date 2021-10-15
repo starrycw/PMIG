@@ -713,4 +713,3 @@ class PMIG_Gen_Comb_2to1_PNode(_Base_PMIG_Gen_Comb_2to1):
         pmux.create_po(literal_abc, name="mux_PO")
         return pmux, {'fanin_A': literal_a, 'fanin_B': literal_b, 'ctl': literal_c, 'po':literal_abc}
 
-    
