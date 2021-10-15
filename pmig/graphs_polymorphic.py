@@ -682,6 +682,20 @@ class PMIG_Gen_Comb_2to1_PNode(_Base_PMIG_Gen_Comb_2to1):
         self._log_PO_id_map = None
         self._log_Literal_map = None
 
+        # self._list_majs_with_const_fanin_in_1 =
+        # self._list_majs_with_const_fanin_in_2 =
+
+    # def _get_list_majs_with_const_fanin(self, pmig_obj):
+    #     '''
+    #     获取一个PMIG中以const作为扇入的的MAJ的信息。注意：本方法会检查MAJ是否可消除。若
+    #
+    #     :param pmig_obj:
+    #     :return:
+    #     '''
+    #     assert isinstance(pmig_obj, PMIG)
+    #     for ii_maj in pmig_obj.get_iter_majs():
+
+
     def get_pmux(self):
         '''
         Get a PMIG obj of a 2 to 1 MUX, with 3 PIs: "in_a", "in_b" and "ctl"(select signal), and a 1 output: "mux_PO".
@@ -698,3 +712,5 @@ class PMIG_Gen_Comb_2to1_PNode(_Base_PMIG_Gen_Comb_2to1):
         literal_abc = pmux.create_maj(literal_ac, literal_bc, pmux.get_literal_const1())  # M( M(a,c,0), M(b, c', 0), 1)
         pmux.create_po(literal_abc, name="mux_PO")
         return pmux, {'fanin_A': literal_a, 'fanin_B': literal_b, 'ctl': literal_c, 'po':literal_abc}
+
+    

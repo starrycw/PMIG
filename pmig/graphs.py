@@ -434,10 +434,11 @@ class PMIG:
         repr_info_ptype = '       Polymorphic type: {}'.format(self.attr_ptype_get())
         repr_info_pedge = '       {} nodes have polymorphic fanin edge(s)'.format(self.n_nodes_with_polymorphic_edge())
         repr_info_pconst = '       {} nodes take const 0/1 or const 1/0 as fanin(s)'.format(self.n_nodes_with_polymorphic_pi())
+        repr_info_const = '       {} nodes take const node(s) as fanin(s)'.format(self.n_nodes_with_const_fanin())
         repr_info_ppo = '       {} POs has polymorphic fanin edge(s)'.format(self.n_pos_with_polymorphic_edge())
         repr_info_end = '  }'
 
-        repr_info_all = repr_info_header + '\n' + repr_info_name + '\n' + repr_info_nodes + '\n' + repr_info_ptype + '\n' + repr_info_pedge + '\n' + repr_info_pconst + '\n' + repr_info_ppo + '\n' + repr_info_end
+        repr_info_all = repr_info_header + '\n' + repr_info_name + '\n' + repr_info_nodes + '\n' + repr_info_ptype + '\n' + repr_info_pedge + '\n' + repr_info_pconst+ '\n' + repr_info_const + '\n' + repr_info_ppo + '\n' + repr_info_end
         return repr_info_all
     # self._polymorphic_flag
 
@@ -765,6 +766,49 @@ class PMIG:
         '''
         return ( i << 2 for i, n in enumerate(copy.deepcopy(self._nodes)))
 
+
+####### 统计以const作为扇入的nodes：
+    def is_node_with_const_fanin(self, mig_n):
+        '''
+        If a node (_MIG_Node) has cosnt fan-in .
+
+        :param mig_n: _MIG_Node
+        :return: Bool
+        '''
+        assert isinstance(mig_n, _MIG_Node)
+        if not ( mig_n._type in (_MIG_Node.MAJ, _MIG_Node.LATCH) ):
+            return False
+
+        if mig_n._type == _MIG_Node.MAJ:
+            if mig_n.get_maj_child0() in (self.get_literal_const0(), self.get_literal_const1(), self.get_literal_const_0_1(), self.get_literal_const_1_0()):
+                return True
+            if mig_n.get_maj_child1() in (self.get_literal_const0(), self.get_literal_const1(), self.get_literal_const_0_1(), self.get_literal_const_1_0()):
+                return True
+            if mig_n.get_maj_child2() in (self.get_literal_const0(), self.get_literal_const1(), self.get_literal_const_0_1(), self.get_literal_const_1_0()):
+                return True
+            return False
+
+        elif mig_n._type == _MIG_Node.LATCH:
+            if mig_n.get_latch_next() in (self.get_literal_const0(), self.get_literal_const1(), self.get_literal_const_0_1(), self.get_literal_const_1_0()):
+                return True
+            return False
+
+        else:
+            assert False
+
+    def get_iter_nodes_with_const_fanin(self):
+        '''
+        Return literals of nodes with polymorphic fan-in PI.
+
+        :return:
+        '''
+        return (i << 2 for i, n in enumerate(copy.deepcopy(self._nodes)) if self.is_node_with_const_fanin(n))
+
+    def n_nodes_with_const_fanin(self):
+        cnt = 0
+        for i in self.get_iter_nodes_with_const_fanin():
+            cnt = cnt + 1
+        return cnt
 
 
 
