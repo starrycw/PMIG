@@ -1147,7 +1147,7 @@ class PMIG_optimization:
         cnt_round = 1
         cnt_0contri_only = 0 # 如果一轮中仅有0优化的替换，该变量加一。该变量用于指示是否连续几轮都是只有0优化的替换
         while flag_continue or (cnt_0contri_only <= 2):
-            print("ROUND {}".format(cnt_round))
+            print("ROUND {}, cnt:{}".format(cnt_round, cnt_0contri_only))
             flag_continue = False
             maj_list = list(current_pmig_obj.get_iter_majs())
             last_optimized_root_l = None  # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
@@ -1155,13 +1155,23 @@ class PMIG_optimization:
                 if (last_optimized_root_l == None) or (
                         (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l)):
                     # print("Node {}".format(ii_maj_l))
+                    # if cnt_0contri_only == 0:
+                    #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+                    #         = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
+                    #                                                                         n_leaves=n_leaves)
+                    # else:
+                    #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+                    #         = PMIG_operator.op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
+                    #                                                     n_leaves=n_leaves)
                     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
-                        = PMIG_operator.op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
-                                                                    n_leaves=n_leaves)
+                        = PMIG_operator.op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r=current_pmig_obj,
+                                                                                        root_l=ii_maj_l,
+                                                                                        n_leaves=n_leaves)
                     if sat_flag:
                         assert n_maj_compare[0] >= n_maj_compare[1]
                         if n_maj_compare[0] > n_maj_compare[1]:
                             flag_continue = True
+                            print("-------- Positive optimization! ------->")
                         last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
                         current_pmig_obj = optimized_mig_obj
                         print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,

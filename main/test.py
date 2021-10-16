@@ -73,8 +73,8 @@ print(mig_pedge)
 
 
 opti_obj = pmig_ops.PMIG_optimization()
-opti_obj.initialization(mig_obj=mig_pedge, n_random_veri=20)
+opti_obj.initialization(mig_obj=mig_pnode, n_random_veri=20)
 opti_obj.opti_clean_pos_by_type()
 opti_obj.opti_clean_irrelevant_nodes()
-opti_obj.opti_exact_synthesis_size_frompo(n_leaves=6)
+opti_obj.opti_exact_synthesis_size_frompo_allow_0contribution(n_leaves=5)
 opti_obj.opti_clean_irrelevant_nodes()

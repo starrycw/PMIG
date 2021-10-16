@@ -29,7 +29,7 @@ path_aiger_dir = g_vars.get_value("path_aiger_dir")
 
 path_abc_srcfile = "cht.blif"
 
-status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", ), echo_mode)
+status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", ), echo_mode=1)
 print(status, warnings)
 
 aig_1 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
@@ -44,7 +44,7 @@ print(mig_1)
 
 path_abc_srcfile = "apex7.blif"
 
-status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", ), echo_mode)
+status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", ), echo_mode=1)
 print(status, warnings)
 
 aig_2 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
