@@ -18,14 +18,14 @@ from pmig import exact_synthesis as ex_syn
 from pmig import graphs_polymorphic
 
 ################################################
-task_id = 7
+task_id = 8
 assert task_id in range(0, 16)
 
-task_type = 'pedge'
+task_type = 'pnode'
 task_allow_0contributation = True
 assert task_type in ('pedge', 'pnode')
 
-task_n_leaves = 5
+task_n_leaves = 4
 task_n_random_veri = 20
 ################################################
 input_file_list = (
@@ -57,7 +57,7 @@ path_aiger_dir = g_vars.get_value("path_aiger_dir")
 
 path_abc_srcfile = input_file_list[task_id-1][0]
 
-status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", ), echo_mode=1)
+status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ('strash', 'rewrite', 'rewrite', 'rewrite', 'rewrite', 'rewrite', 'rewrite'), echo_mode=1)
 print(status, warnings)
 
 aig_1 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
@@ -72,7 +72,7 @@ print(mig_1)
 
 path_abc_srcfile = input_file_list[task_id-1][1]
 
-status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ("strash", ), echo_mode=1)
+status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ('strash', 'rewrite', 'rewrite', 'rewrite', 'rewrite', 'rewrite', 'rewrite'), echo_mode=1)
 print(status, warnings)
 
 aig_2 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')

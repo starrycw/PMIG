@@ -1174,7 +1174,7 @@ class PMIG_optimization:
                             print("-------- Positive optimization! ------->")
                         last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
                         current_pmig_obj = optimized_mig_obj
-                        print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,
+                        print("Round {}, Root {} - 已替换，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,
                                                                                   n_maj_compare[0],
                                                                                   n_maj_compare[1]))
 
