@@ -145,13 +145,13 @@ for task_to_be_exec in list_tasks_to_be_exec:
         opti_obj.opti_clean_irrelevant_nodes()
 
         pmig_writer_mig_pedge = graphs_io.pmig_writer(pmig_obj=mig_pedge)
-        f_path = '{}/result/{}_{}_{}'.format(path_abc_srcdir, task_type, task_allow_0contributation, task_n_leaves)
+        f_path = path_abc_srcdir + '/result'
         pmig_writer_mig_pedge.write_to_file(f_name='mig_pedge.pmig', f_path=f_path)
 
         pmig_obj_opti = opti_obj.get_current_pmig()
         pmig_writer_mig_opti = graphs_io.pmig_writer(pmig_obj=pmig_obj_opti)
-        f_path = '{}/result/{}_{}_{}'.format(path_abc_srcdir, task_type, task_allow_0contributation, task_n_leaves)
-        pmig_writer_mig_opti.write_to_file(f_name='mig_pedge_opti.pmig', f_path=f_path)
+        f_path = path_abc_srcdir + '/result'
+        pmig_writer_mig_opti.write_to_file(f_name='mig_pedge_opti_{}_{}_{}.pmig'.format(task_type, task_allow_0contributation, task_n_leaves), f_path=f_path)
 
     elif task_type == 'pnode':
         opti_obj = pmig_ops.PMIG_optimization()
@@ -165,13 +165,13 @@ for task_to_be_exec in list_tasks_to_be_exec:
         opti_obj.opti_clean_irrelevant_nodes()
 
         pmig_writer_mig_pnode = graphs_io.pmig_writer(pmig_obj=mig_pnode)
-        f_path = '{}/result/{}_{}_{}'.format(path_abc_srcdir, task_type, task_allow_0contributation, task_n_leaves)
+        f_path = path_abc_srcdir + '/result'
         pmig_writer_mig_pnode.write_to_file(f_name='mig_pnode.pmig', f_path=f_path)
 
         pmig_obj_opti = opti_obj.get_current_pmig()
         pmig_writer_mig_opti = graphs_io.pmig_writer(pmig_obj=pmig_obj_opti)
-        f_path = '{}/result/{}_{}_{}'.format(path_abc_srcdir, task_type, task_allow_0contributation, task_n_leaves)
-        pmig_writer_mig_opti.write_to_file(f_name='mig_pnode_opti.pmig', f_path=f_path)
+        f_path = path_abc_srcdir + '/result'
+        pmig_writer_mig_opti.write_to_file(f_name='mig_pnode_opti_{}_{}_{}.pmig'.format(task_type, task_allow_0contributation, task_n_leaves), f_path=f_path)
 
 
     pmig_writer_mig1 = graphs_io.pmig_writer(pmig_obj=mig_1)
