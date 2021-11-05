@@ -2092,10 +2092,11 @@ is_legal_fanin_literal
             l_new = self._nodemap_original_to_new[l_original]
             return PMIG.add_attr_if_has_attr(l_new, literal_original)
 
-    def pmig_clean_irrelevant_nodes(self, pos=None):
+    def pmig_clean_irrelevant_nodes(self, pos=None, keep_pos_order = True):
         '''
         Return a new PMIG obj, only containing the nodes relevant to specified outputs (pos).
 
+        若keep_pos_order=False，则使用 set() 函数对PO列表进行去重处理，这会导致PO顺序被打乱。
         :param pos: None (Default) or LIST - Specified outputs.
         :return:
         '''
@@ -2103,7 +2104,13 @@ is_legal_fanin_literal
         if pos is None:
             # print(self.n_pos())
             pos = range(0, self.n_pos())
-        pos_set = set(pos)
+
+        if keep_pos_order:
+            pos_set = copy.deepcopy(pos)
+        else:
+            pos_set = set(pos)
+        # print(">>>#", pos)
+        # print(">>>", pos_set)
         pmig_new = PMIG(polymorphic_type=self.attr_ptype_get())
 
         # relevant_literals = self.get_seq_cone(self.get_po_fanin(po_id) for po_id in pos_set)
@@ -2168,6 +2175,7 @@ is_legal_fanin_literal
 
         # Create POs
         for po_i in pos_set:
+            # print(">>>", po_i)
             po_fanin = self.get_po_fanin(po_i)
             po_type = self.get_po_type(po_i)
             new_po_fanin = nmap.get_new_literal(po_fanin)
@@ -2192,6 +2200,7 @@ is_legal_fanin_literal
                 # print(">>>>>", po_id, po_type, po_fanin)
                 reserved_po_list.append(po_id)
         # print(reserved_po_list)
+        # print("RR:", reserved_po_list)
         return self.pmig_clean_irrelevant_nodes(pos=reserved_po_list)
 
 

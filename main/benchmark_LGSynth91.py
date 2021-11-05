@@ -18,14 +18,14 @@ from pmig import exact_synthesis as ex_syn
 from pmig import graphs_polymorphic
 
 ################################################
-task_id = 8
+task_id = 1
 assert task_id in range(0, 16)
 
-task_type = 'pnode'
+task_type = 'pedge'
 task_allow_0contributation = True
 assert task_type in ('pedge', 'pnode')
 
-task_n_leaves = 4
+task_n_leaves = 5
 task_n_random_veri = 20
 ################################################
 input_file_list = (
@@ -41,7 +41,7 @@ input_file_list = (
     ('C499.blif', 'C1355.blif'), # C10
     ('count.blif', 'unreg.blif'), # C11
     ('my_adder.blif', 'unreg.blif'), # C12
-    ('pda.pla', 'vda.blif'), # C13
+    ('pdc.pla', 'vda.blif'), # C13
     ('apex1.pla', 'k2.blif'), # C14
     ('misex3.pla', 'misex3c.pla'), # C15
 )

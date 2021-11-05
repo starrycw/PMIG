@@ -966,6 +966,10 @@ class PMIG_optimization:
                 else:
                     assert False
 
+            # print(list(self.get_last_pmig().get_iter_pos()))
+            # print(list(self.get_last_pmig().get_iter_pos_except_specified_type(i_type=PMIG.PO_OBSOLETE)))
+            # print(list(self.get_current_pmig().get_iter_pos()))
+
             result_pos_value_simple_1, result_pos_value_1, pos_selected_1, pi_vec_1 = simu_obj_current.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
             result_pos_value_simple_2, result_pos_value_2, pos_selected_2, pi_vec_2 = simu_obj_last.simu_pos_value(pi_vec=pi_vec, pos_selected=pos_last_without_obsolete_pos, allow_node_with_fixed_value=False)
             # result_pos_value_simple_3, result_pos_value_3, pos_selected_3, pi_vec_3 = simu_obj_init.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
@@ -1073,7 +1077,7 @@ class PMIG_optimization:
         new_pmig = self._pmig_current.pmig_clean_pos_by_type(po_type_tuple=po_type_tuple)
         self.update_current_pmig(new_pmig=new_pmig, random_veri=False)
         if po_type_tuple == (PMIG.PO_OBSOLETE, ):
-            self._function_verification_random_for_delete_obsoleted_pos(n_random_veri=self._n_random_veri_default)
+            assert self._function_verification_random_for_delete_obsoleted_pos(n_random_veri=self._n_random_veri_default)
 
 #######
     def opti_clean_irrelevant_nodes(self, pos = None):
@@ -1146,7 +1150,7 @@ class PMIG_optimization:
         assert isinstance(current_pmig_obj, PMIG)
         cnt_round = 1
         cnt_0contri_only = 0 # 如果一轮中仅有0优化的替换，该变量加一。该变量用于指示是否连续几轮都是只有0优化的替换
-        while flag_continue or (cnt_0contri_only <= 2):
+        while flag_continue or (cnt_0contri_only < 2):
             print("ROUND {}, cnt:{}".format(cnt_round, cnt_0contri_only))
             flag_continue = False
             maj_list = list(current_pmig_obj.get_iter_majs())
