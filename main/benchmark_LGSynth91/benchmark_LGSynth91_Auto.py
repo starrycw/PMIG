@@ -26,8 +26,8 @@ from pmig import graphs_polymorphic
 ################################################
 list_tasks_to_be_exec = (
     #(task_id, task_type, task_allow_0contribution, task_n_leaves)
-    (15, 'pedge', True, 4),
-    (15, 'pnode', True, 4)
+    (1, 'pedge', True, 4),
+    (1, 'pnode', True, 4)
 )
 
 log_file_name = 'aaaaa'
