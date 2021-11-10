@@ -1593,7 +1593,7 @@ class PMIG_optimization:
         # print('\n')
         print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompo")
 
-        cnt_0opti = 0
+        cnt_0opti = -1
         max_0opti = 2
         flag_continue = True
         current_pmig_obj = self.get_current_pmig()
@@ -1601,7 +1601,7 @@ class PMIG_optimization:
         cnt_round = 1
         while flag_continue or (cnt_0opti <= max_0opti):
             cnt_0opti = cnt_0opti + 1
-            print("ROUND {}".format(cnt_round))
+            print("ROUND {}, cnt_0opti={}".format(cnt_round, cnt_0opti))
             flag_continue = False
             maj_list = list(current_pmig_obj.get_iter_majs())
             for ii_maj_l in maj_list[::-1]:
@@ -1615,7 +1615,7 @@ class PMIG_optimization:
                                                                     if_allow_0contribution=True)
                     if sat_flag:
                         if n_maj_compare[0] > n_maj_compare[1]:
-                            cnt_0opti = 0
+                            cnt_0opti = -1
                             flag_continue = True
                         else:
                             assert n_maj_compare[0] == n_maj_compare[1]
