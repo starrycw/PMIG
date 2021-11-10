@@ -438,7 +438,7 @@ class PMIG:
         repr_info_ppo = '       {} POs has polymorphic fanin edge(s)'.format(self.n_pos_with_polymorphic_edge())
         repr_info_end = '  }'
 
-        repr_info_all = repr_info_header + '\n' + repr_info_name + '\n' + repr_info_nodes + '\n' + repr_info_ptype + '\n' + repr_info_pedge + '\n' + repr_info_pconst+ '\n' + repr_info_const + '\n' + repr_info_ppo + '\n' + repr_info_end
+        repr_info_all = repr_info_header + '\n' + repr_info_name + '; ' + repr_info_nodes + '; ' + repr_info_ptype + '\n' + repr_info_pedge + '; ' + repr_info_pconst+ '; ' + repr_info_const + '; ' + repr_info_ppo + '\n' + repr_info_end
         return repr_info_all
     # self._polymorphic_flag
 

@@ -40,6 +40,69 @@ class PMIG_operator:
 
 #######
     @staticmethod
+    def _function_verification_random(mig_obj_1, mig_obj_2, n_random_veri):
+        '''
+        随机的生成PI向量，用于比较mig_obj_1 和 mig_obj_2的功能。
+
+        随机次数n_random_veri
+
+        :param mig_obj_1
+        :param mig_obj_2
+        :param n_random_veri:
+        :return:
+        '''
+
+        assert isinstance(n_random_veri, int)
+        assert isinstance(mig_obj_1, PMIG)
+        assert isinstance(mig_obj_2, PMIG)
+        assert n_random_veri >= 0
+
+        simu_obj_current = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=mig_obj_1)
+        simu_obj_last = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=mig_obj_2)
+        # simu_obj_init = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=self.get_init_pmig())
+        pi_len = simu_obj_current.get_pis_len()
+        # assert pi_len == simu_obj_init.get_pis_len()
+        assert pi_len == simu_obj_last.get_pis_len()
+
+        for ii_random in range(0, n_random_veri):
+            vec_max = pow(2, pi_len)
+            vec_value = random.randint(0, vec_max)
+            vec_bin = bin(vec_value)[2:]
+            vec_tuple = tuple(str.zfill(vec_bin, pi_len))
+            # print(len(vec_tuple), pi_len, latch_len)
+            assert len(vec_tuple) == pi_len
+            vec_pi_tuple = vec_tuple[:pi_len]
+            pi_vec = []
+            for i in vec_pi_tuple:
+                if int(i) == 0:
+                    pi_vec.append(pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_00)
+                elif int(i) == 1:
+                    pi_vec.append(pmig_logic.PMIG_LogicSimu_Comb.LVALUE_V_11)
+                else:
+                    assert False
+
+            result_pos_value_simple_1, result_pos_value_1, pos_selected_1, pi_vec_1 = simu_obj_current.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
+            result_pos_value_simple_2, result_pos_value_2, pos_selected_2, pi_vec_2 = simu_obj_last.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
+            # result_pos_value_simple_3, result_pos_value_3, pos_selected_3, pi_vec_3 = simu_obj_init.simu_pos_value(pi_vec=pi_vec, allow_node_with_fixed_value=False)
+
+            # print(result_pos_value_simple_1)
+            # print(result_pos_value_simple_2)
+            # print(result_pos_value_simple_3)
+
+            if result_pos_value_simple_1 != result_pos_value_simple_2:
+                print("Random Verification failed!")
+                print(result_pos_value_simple_1)
+                print(result_pos_value_simple_2)
+                return False
+            # if result_pos_value_simple_1 != result_pos_value_simple_3:
+            #     return False
+
+        # print("Random Verification x{} passed!".format(n_random_veri))
+        return True
+
+
+#######
+    @staticmethod
     def op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r, root_l, n, stop_list=[]):
         '''
         输入一个root_l（literal)，以及整数n，返回一个以root_l对应的node为root的n割集PMIG对象。
@@ -345,7 +408,7 @@ class PMIG_operator:
     @staticmethod
     def op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r, root_l, n):
         '''
-        获得以root_l(literal)为root的n-cut，并将获得的cut构建一个PMIG用于优化。
+        获得以root_l(literal)为root的n-cut，并将获得的cut构建一个PMIG用于优化。该方法使用op_reconvergence_driven_cut_computation_with_multifanout_checks搜索割集。
 
         return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited
 
@@ -413,211 +476,284 @@ class PMIG_operator:
 
 
 
+#######
     @staticmethod
-    def op_cut_exact_synthesis_size(pmig_obj_r, root_l, n_leaves):
+    def op_get_n_cut_pmig_with_stop_list(pmig_obj_r, root_l, n, stop_list = []):
         '''
-        在pmig_obj_r中，以literal为root_l的node为root，获得一个n_leaves割集，然后对该割集进行exact synthesis
+        获得以root_l(literal)为root的n-cut，并将获得的cut构建一个PMIG用于优化。该方法使用op_reconvergence_driven_cut_computation_with_stop_list搜索割集。
 
-        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(optimized_mig_obj), n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model
+        return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited
 
-        sat_flag: bool - 是否可优化
+        cut_map_pi 为字典，存储着生成的图的PI与cut leaves之间的对应关系，key为生成的PMIG的PI literal， value为cut的leaves literal
 
-        new_pmig: PMIG - 优化后的割集PMIG
+        cut_map_po 为元组：(cut_map.get_new_literal(root_l), root_l)
 
-        optimized_mig_obj: PMIG - 对割集进行优化后的图
-
-        n_maj_compare: tuple - (优化前割集的MAJ数目, 优化后割集的MAJ数目)
-
-        new_literal_of_root: int - 割集root在新图中的literal（含属性）
-
-        info_tuple_cut:
-
-        info_tuple_model:
+        nodeset_leaves, nodeset_visited 为割集的信息
 
         :param pmig_obj_r:
-        :param root_l:
-        :param n_leaves:
+        :param root_l: INT - root node的literal
+        :param n: INT - leaves数目上限
         :return:
         '''
-        ####################################class
-        class Map_for_ApplyOptiCut:
-            '''
-            用于将PMIG的cut替换为优化后的cut
-            '''
-            def __init__(self, deleted_literal, map_cut_pi):
-                self._dict_literal_old_to_new = {PMIG.get_literal_const0():PMIG.get_literal_const0()}
-                self._dict_literal_cut_to_old = copy.deepcopy(map_cut_pi)
-                self._dict_literal_cut_to_new = {}
-                self._deleted_literal = copy.deepcopy(deleted_literal)
 
-
-
-            def map_literal_old_to_new(self, l_old, l_new):
-                assert PMIG.is_noattribute_literal(f=l_old)
-                assert l_old not in self._dict_literal_old_to_new
-                assert l_old not in self._deleted_literal
-                self._dict_literal_old_to_new[l_old] = l_new
-
-            def get_new_literal_of_old(self, l_old):
-                l_old_noattr = PMIG.get_noattribute_literal(f=l_old)
-                assert l_old_noattr in self._dict_literal_old_to_new
-                assert l_old_noattr not in self._deleted_literal
-                l_new_noattr = self._dict_literal_old_to_new[l_old_noattr]
-                l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_old)
-                return l_new
-
-            def map_literal_cut_to_new(self, l_cut, l_new):
-                assert PMIG.is_noattribute_literal(f=l_cut)
-                assert l_cut not in self._dict_literal_cut_to_new
-                self._dict_literal_cut_to_new[l_cut] = l_new
-
-            def get_new_literal_of_cut(self, l_cut):
-                l_cut_noattr = PMIG.get_noattribute_literal(f=l_cut)
-                if l_cut_noattr in self._dict_literal_cut_to_old:
-                    l_old_noattr = self._dict_literal_cut_to_old[l_cut_noattr]
-                    l_old = PMIG.add_attr_if_has_attr(f=l_old_noattr, c=l_cut)
-                    return self.get_new_literal_of_old(l_old=l_old)
-                else:
-                    assert l_cut_noattr in self._dict_literal_cut_to_new
-                    l_new_noattr = self._dict_literal_cut_to_new[l_cut_noattr]
-                    l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_cut)
-                    return l_new
-
-
-        ####################################main
         assert isinstance(pmig_obj_r, PMIG)
+        # multifanout_list = PMIG_operator.op_get_all_nodes_with_multiple_fanouts_fast(pmig_obj_r=pmig_obj_r)
+        # print("*-*-*-*-*-*", multifanout_list)
+        # Get n-cut
+        nodeset_leaves, nodeset_visited = PMIG_operator.op_reconvergence_driven_cut_computation_with_stop_list(pmig_obj_r=pmig_obj_r, root_l=root_l, n=n, stop_list=stop_list)
+        nodeset_cone = pmig_obj_r.get_cone(roots=(root_l,), stop=nodeset_leaves)
+        # print("#####", nodeset_visited)
+        # print("#####", nodeset_leaves)
+        # checks
+        for i in nodeset_visited:
+            assert (i in nodeset_leaves) or (i in nodeset_cone)
+        for i in nodeset_cone:
+            assert i in nodeset_visited
+        for i in nodeset_leaves:
+            assert i in nodeset_visited
+        assert len(nodeset_leaves) + len(nodeset_cone) == len(nodeset_visited)
 
-        # 获得cut
-        cut_pmig_obj, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited = PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
-        assert isinstance(cut_pmig_obj, PMIG)
-        # 若cut大小为0,则直接返回
-        if cut_pmig_obj.n_majs() == 0:
-            return False, None, None, None, None, None, None
+        # Create PMIG
+        pmig_cut = PMIG(polymorphic_type=pmig_obj_r.attr_ptype_get())
+        cut_map = PMIG_operator.Cut_Mapping()
+        # PI
+        for i in nodeset_leaves:
+            if i == pmig_cut.get_literal_const0():
+                cut_map.add_nodes_mapping(l_old=i, l_new=i)
+            else:
+                new_l = pmig_cut.create_pi()
+                cut_map.add_nodes_mapping(l_old=i, l_new=new_l)
+        # MAJ
+        for i in nodeset_cone:
+            assert pmig_obj_r.is_maj(f=i)
+            ch0, ch1, ch2 = pmig_obj_r.get_maj_fanins(f=i)
+            ch0_new = cut_map.get_new_literal(l_old=ch0)
+            ch1_new = cut_map.get_new_literal(l_old=ch1)
+            ch2_new = cut_map.get_new_literal(l_old=ch2)
+            new_l = pmig_cut.create_maj(child0=ch0_new, child1=ch1_new, child2=ch2_new)
+            cut_map.add_nodes_mapping(l_old=i, l_new=new_l)
 
-        # print("**********")
-        # print(nodeset_leaves)
-        # print(nodeset_visited)
-        # 获得cut功能
-        pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_pmig_obj)
-        func1, func2, pflag = pmigsimu_obj.simu_for_exact_synthesis()
-        # exact synthesis
-        exsyn_obj = exact_synthesis.PMIG_Cut_ExactSynthesis(func1=func1, func2=func2, allow_polymorphic=pflag)
-        sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs() - 1, echo_mode=False)
+        # PO
+        pmig_cut.create_po(f=cut_map.get_new_literal(root_l))
 
-        # 应用优化后的cut
-        if sat_flag:
-            # print
-            # print("发现可优化的割集：root = {}, 原割集大小 = {}, 优化后的割集大小 = {}".format(root_l, cut_pmig_obj.n_majs(), new_pmig.n_majs()))
-            n_maj_compare = (cut_pmig_obj.n_majs(), new_pmig.n_majs())
-            # 功能验证
-            new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
-            new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
-            # print(new_func1)
-            # print(func1)
-            assert new_func1 == func1
-            assert new_func2 == func2
+        # Collect info
+        cut_map_po = (cut_map.get_new_literal(root_l), root_l)
+        cut_map_pi = {}
+        for i in nodeset_leaves:
+            key = cut_map.get_new_literal(l_old=i)
+            cut_map_pi[key] = i
 
-            # 应用
-            optimized_mig_obj = PMIG(name=pmig_obj_r.attr_get_pmig_name(), polymorphic_type=pmig_obj_r.attr_ptype_get())
-            # 原图中可被直接删除的nodes，即割集中除去root和leaves以外的其它所有nodes。
-            list_nodes_to_be_deleted = []
-            for ii_l in nodeset_visited:
-                if (ii_l not in nodeset_leaves) and (ii_l != root_l):
-                    list_nodes_to_be_deleted.append(ii_l)
-            # print(list_nodes_to_be_deleted,"***")
-            # literal映射字典
-            map_dict = Map_for_ApplyOptiCut(deleted_literal=list_nodes_to_be_deleted, map_cut_pi=cut_map_pi)
-
-            # cut po在原图中的literal，即root_l
-            po_literal_old = cut_map_po[1]
-
-            # 开始映射
-            for ii_l in pmig_obj_r.get_iter_nodes_all():
-                if pmig_obj_r.has_name(f=ii_l):
-                    newnode_name = pmig_obj_r.get_name_by_id(f=ii_l)
-                else:
-                    newnode_name = None
-
-                if pmig_obj_r.is_const0(f=ii_l):
-                    assert ii_l == PMIG.get_literal_const0()
-
-                elif pmig_obj_r.is_pi(f=ii_l):
-                    newnode_l = optimized_mig_obj.create_pi(name=newnode_name)
-                    map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
-
-                elif ii_l == po_literal_old:
-                    for ii_cut_l in new_pmig.get_iter_nodes_all():
-                        if new_pmig.is_maj(f=ii_cut_l):
-                            ch0_l_cut = new_pmig.get_maj_child0(f=ii_cut_l)
-                            ch1_l_cut = new_pmig.get_maj_child1(f=ii_cut_l)
-                            ch2_l_cut = new_pmig.get_maj_child2(f=ii_cut_l)
-
-                            ch0_l_new = map_dict.get_new_literal_of_cut(l_cut=ch0_l_cut)
-                            ch1_l_new = map_dict.get_new_literal_of_cut(l_cut=ch1_l_cut)
-                            ch2_l_new = map_dict.get_new_literal_of_cut(l_cut=ch2_l_cut)
-
-                            newnode_l = optimized_mig_obj.create_maj(child0=ch0_l_new, child1=ch1_l_new, child2=ch2_l_new)
-                            map_dict.map_literal_cut_to_new(l_cut=ii_cut_l, l_new=newnode_l)
-                        else:
-                            assert (new_pmig.is_const0(f=ii_cut_l)) or (new_pmig.is_pi(f=ii_cut_l))
-
-                    # assert ii_cut_l == cut_map_po[0]
-                    assert ii_cut_l == PMIG.get_noattribute_literal( new_pmig.get_po_fanin(po=0) )
-
-                    newnode_l_withattr = newnode_l
-                    if model_po[1]:
-                        newnode_l_withattr = newnode_l_withattr + 1
-                    if model_po[2]:
-                        newnode_l_withattr = newnode_l_withattr + 2
-
-                    map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l_withattr)
-                    new_literal_of_root = newnode_l_withattr
+        # return
+        return copy.deepcopy(pmig_cut), cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited
 
 
 
-                elif pmig_obj_r.is_maj(f=ii_l):
-                    if (ii_l not in list_nodes_to_be_deleted) and (ii_l != po_literal_old):
-                        ch0_l_old = pmig_obj_r.get_maj_child0(f=ii_l)
-                        ch1_l_old = pmig_obj_r.get_maj_child1(f=ii_l)
-                        ch2_l_old = pmig_obj_r.get_maj_child2(f=ii_l)
-
-                        ch0_l_new = map_dict.get_new_literal_of_old(l_old=ch0_l_old)
-                        # print(ch1_l_old)
-                        ch1_l_new = map_dict.get_new_literal_of_old(l_old=ch1_l_old)
-                        ch2_l_new = map_dict.get_new_literal_of_old(l_old=ch2_l_old)
-
-                        newnode_l = optimized_mig_obj.create_maj(child0=ch0_l_new, child1=ch1_l_new, child2=ch2_l_new)
-                        map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
-                        if newnode_name != None:
-                            optimized_mig_obj.set_name(f=newnode_l, name=newnode_name)
-                else:
-                    assert False
-
-            for ii_po_id, ii_po_fanin, ii_po_type in pmig_obj_r.get_iter_pos():
-                # print(ii_po_fanin)
-                # print(map_dict._dict_literal_old_to_new)
-                new_po_fanin = map_dict.get_new_literal_of_old(l_old=ii_po_fanin)
-                new_po_name = pmig_obj_r.get_name_by_po(po=ii_po_id)
-                optimized_mig_obj.create_po(f=new_po_fanin, name = new_po_name, po_type=ii_po_type)
-
-
-        else:
-            new_pmig = None
-            optimized_mig_obj = None
-            n_maj_compare = 0
-            new_literal_of_root = None
-            info_tuple_cut = None
-            info_tuple_model = None
-
-        info_tuple_model = ( copy.deepcopy(model_nodes_list), copy.deepcopy(model_po) )
-        info_tuple_cut = ( copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves), copy.deepcopy(nodeset_visited) )
-        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(optimized_mig_obj), n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model
-
+    # @staticmethod
+    # def op_cut_exact_synthesis_size(pmig_obj_r, root_l, n_leaves):
+    #     '''
+    #     在pmig_obj_r中，以literal为root_l的node为root，获得一个n_leaves割集，然后对该割集进行exact synthesis
+    #
+    #     return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(optimized_mig_obj), n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model
+    #
+    #     sat_flag: bool - 是否可优化
+    #
+    #     new_pmig: PMIG - 优化后的割集PMIG
+    #
+    #     optimized_mig_obj: PMIG - 对割集进行优化后的图
+    #
+    #     n_maj_compare: tuple - (优化前割集的MAJ数目, 优化后割集的MAJ数目)
+    #
+    #     new_literal_of_root: int - 割集root在新图中的literal（含属性）
+    #
+    #     info_tuple_cut:
+    #
+    #     info_tuple_model:
+    #
+    #     :param pmig_obj_r:
+    #     :param root_l:
+    #     :param n_leaves:
+    #     :return:
+    #     '''
+    #     ####################################class
+    #     class Map_for_ApplyOptiCut:
+    #         '''
+    #         用于将PMIG的cut替换为优化后的cut
+    #         '''
+    #         def __init__(self, deleted_literal, map_cut_pi):
+    #             self._dict_literal_old_to_new = {PMIG.get_literal_const0():PMIG.get_literal_const0()}
+    #             self._dict_literal_cut_to_old = copy.deepcopy(map_cut_pi)
+    #             self._dict_literal_cut_to_new = {}
+    #             self._deleted_literal = copy.deepcopy(deleted_literal)
+    #
+    #
+    #
+    #         def map_literal_old_to_new(self, l_old, l_new):
+    #             assert PMIG.is_noattribute_literal(f=l_old)
+    #             assert l_old not in self._dict_literal_old_to_new
+    #             assert l_old not in self._deleted_literal
+    #             self._dict_literal_old_to_new[l_old] = l_new
+    #
+    #         def get_new_literal_of_old(self, l_old):
+    #             l_old_noattr = PMIG.get_noattribute_literal(f=l_old)
+    #             assert l_old_noattr in self._dict_literal_old_to_new
+    #             assert l_old_noattr not in self._deleted_literal
+    #             l_new_noattr = self._dict_literal_old_to_new[l_old_noattr]
+    #             l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_old)
+    #             return l_new
+    #
+    #         def map_literal_cut_to_new(self, l_cut, l_new):
+    #             assert PMIG.is_noattribute_literal(f=l_cut)
+    #             assert l_cut not in self._dict_literal_cut_to_new
+    #             self._dict_literal_cut_to_new[l_cut] = l_new
+    #
+    #         def get_new_literal_of_cut(self, l_cut):
+    #             l_cut_noattr = PMIG.get_noattribute_literal(f=l_cut)
+    #             if l_cut_noattr in self._dict_literal_cut_to_old:
+    #                 l_old_noattr = self._dict_literal_cut_to_old[l_cut_noattr]
+    #                 l_old = PMIG.add_attr_if_has_attr(f=l_old_noattr, c=l_cut)
+    #                 return self.get_new_literal_of_old(l_old=l_old)
+    #             else:
+    #                 assert l_cut_noattr in self._dict_literal_cut_to_new
+    #                 l_new_noattr = self._dict_literal_cut_to_new[l_cut_noattr]
+    #                 l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_cut)
+    #                 return l_new
+    #
+    #
+    #     ####################################main
+    #     assert isinstance(pmig_obj_r, PMIG)
+    #
+    #     # 获得cut
+    #     cut_pmig_obj, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited = PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
+    #     assert isinstance(cut_pmig_obj, PMIG)
+    #     # 若cut大小为0,则直接返回
+    #     if cut_pmig_obj.n_majs() == 0:
+    #         return False, None, None, None, None, None, None
+    #
+    #     # print("**********")
+    #     # print(nodeset_leaves)
+    #     # print(nodeset_visited)
+    #     # 获得cut功能
+    #     pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_pmig_obj)
+    #     func1, func2, pflag = pmigsimu_obj.simu_for_exact_synthesis()
+    #     # exact synthesis
+    #     exsyn_obj = exact_synthesis.PMIG_Cut_ExactSynthesis(func1=func1, func2=func2, allow_polymorphic=pflag)
+    #     sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs() - 1, echo_mode=False)
+    #
+    #     # 应用优化后的cut
+    #     if sat_flag:
+    #         # print
+    #         # print("发现可优化的割集：root = {}, 原割集大小 = {}, 优化后的割集大小 = {}".format(root_l, cut_pmig_obj.n_majs(), new_pmig.n_majs()))
+    #         n_maj_compare = (cut_pmig_obj.n_majs(), new_pmig.n_majs())
+    #         # 功能验证
+    #         new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
+    #         new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
+    #         # print(new_func1)
+    #         # print(func1)
+    #         assert new_func1 == func1
+    #         assert new_func2 == func2
+    #
+    #         # 应用
+    #         optimized_mig_obj = PMIG(name=pmig_obj_r.attr_get_pmig_name(), polymorphic_type=pmig_obj_r.attr_ptype_get())
+    #         # 原图中可被直接删除的nodes，即割集中除去root和leaves以外的其它所有nodes。
+    #         list_nodes_to_be_deleted = []
+    #         for ii_l in nodeset_visited:
+    #             if (ii_l not in nodeset_leaves) and (ii_l != root_l):
+    #                 list_nodes_to_be_deleted.append(ii_l)
+    #         # print(list_nodes_to_be_deleted,"***")
+    #         # literal映射字典
+    #         map_dict = Map_for_ApplyOptiCut(deleted_literal=list_nodes_to_be_deleted, map_cut_pi=cut_map_pi)
+    #
+    #         # cut po在原图中的literal，即root_l
+    #         po_literal_old = cut_map_po[1]
+    #
+    #         # 开始映射
+    #         for ii_l in pmig_obj_r.get_iter_nodes_all():
+    #             if pmig_obj_r.has_name(f=ii_l):
+    #                 newnode_name = pmig_obj_r.get_name_by_id(f=ii_l)
+    #             else:
+    #                 newnode_name = None
+    #
+    #             if pmig_obj_r.is_const0(f=ii_l):
+    #                 assert ii_l == PMIG.get_literal_const0()
+    #
+    #             elif pmig_obj_r.is_pi(f=ii_l):
+    #                 newnode_l = optimized_mig_obj.create_pi(name=newnode_name)
+    #                 map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
+    #
+    #             elif ii_l == po_literal_old:
+    #                 for ii_cut_l in new_pmig.get_iter_nodes_all():
+    #                     if new_pmig.is_maj(f=ii_cut_l):
+    #                         ch0_l_cut = new_pmig.get_maj_child0(f=ii_cut_l)
+    #                         ch1_l_cut = new_pmig.get_maj_child1(f=ii_cut_l)
+    #                         ch2_l_cut = new_pmig.get_maj_child2(f=ii_cut_l)
+    #
+    #                         ch0_l_new = map_dict.get_new_literal_of_cut(l_cut=ch0_l_cut)
+    #                         ch1_l_new = map_dict.get_new_literal_of_cut(l_cut=ch1_l_cut)
+    #                         ch2_l_new = map_dict.get_new_literal_of_cut(l_cut=ch2_l_cut)
+    #
+    #                         newnode_l = optimized_mig_obj.create_maj(child0=ch0_l_new, child1=ch1_l_new, child2=ch2_l_new)
+    #                         map_dict.map_literal_cut_to_new(l_cut=ii_cut_l, l_new=newnode_l)
+    #                     else:
+    #                         assert (new_pmig.is_const0(f=ii_cut_l)) or (new_pmig.is_pi(f=ii_cut_l))
+    #
+    #                 # assert ii_cut_l == cut_map_po[0]
+    #                 assert ii_cut_l == PMIG.get_noattribute_literal( new_pmig.get_po_fanin(po=0) )
+    #
+    #                 newnode_l_withattr = newnode_l
+    #                 if model_po[1]:
+    #                     newnode_l_withattr = newnode_l_withattr + 1
+    #                 if model_po[2]:
+    #                     newnode_l_withattr = newnode_l_withattr + 2
+    #
+    #                 map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l_withattr)
+    #                 new_literal_of_root = newnode_l_withattr
+    #
+    #
+    #
+    #             elif pmig_obj_r.is_maj(f=ii_l):
+    #                 if (ii_l not in list_nodes_to_be_deleted) and (ii_l != po_literal_old):
+    #                     ch0_l_old = pmig_obj_r.get_maj_child0(f=ii_l)
+    #                     ch1_l_old = pmig_obj_r.get_maj_child1(f=ii_l)
+    #                     ch2_l_old = pmig_obj_r.get_maj_child2(f=ii_l)
+    #
+    #                     ch0_l_new = map_dict.get_new_literal_of_old(l_old=ch0_l_old)
+    #                     # print(ch1_l_old)
+    #                     ch1_l_new = map_dict.get_new_literal_of_old(l_old=ch1_l_old)
+    #                     ch2_l_new = map_dict.get_new_literal_of_old(l_old=ch2_l_old)
+    #
+    #                     newnode_l = optimized_mig_obj.create_maj(child0=ch0_l_new, child1=ch1_l_new, child2=ch2_l_new)
+    #                     map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
+    #                     if newnode_name != None:
+    #                         optimized_mig_obj.set_name(f=newnode_l, name=newnode_name)
+    #             else:
+    #                 assert False
+    #
+    #         for ii_po_id, ii_po_fanin, ii_po_type in pmig_obj_r.get_iter_pos():
+    #             # print(ii_po_fanin)
+    #             # print(map_dict._dict_literal_old_to_new)
+    #             new_po_fanin = map_dict.get_new_literal_of_old(l_old=ii_po_fanin)
+    #             new_po_name = pmig_obj_r.get_name_by_po(po=ii_po_id)
+    #             optimized_mig_obj.create_po(f=new_po_fanin, name = new_po_name, po_type=ii_po_type)
+    #
+    #
+    #     else:
+    #         new_pmig = None
+    #         optimized_mig_obj = None
+    #         n_maj_compare = 0
+    #         new_literal_of_root = None
+    #         info_tuple_cut = None
+    #         info_tuple_model = None
+    #
+    #     info_tuple_model = ( copy.deepcopy(model_nodes_list), copy.deepcopy(model_po) )
+    #     info_tuple_cut = ( copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves), copy.deepcopy(nodeset_visited) )
+    #     return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(optimized_mig_obj), n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model
 
     @staticmethod
-    def op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r, root_l, n_leaves):
+    def op_cut_exact_synthesis_size(pmig_obj_r, root_l, n_leaves, cut_computation_method, if_allow_0contribution):
         '''
-        与op_cut_exact_synthesis_size不同的是，该方法将允许0优化的替换。
+        修改于2021.11.10。修改：1. 允许指定割集搜索方式; 2. 由“判断割集PMIG是否有优化 -> 替换到原图”更改为“替换到原图 -> 判断替换后整个PMIG是否有优化”
+
+        cut_computation: rec_driven(recovergence driven cut computation), rec_driven_mfc(recovergence driven cut computation with multi-fanout-checks)
 
         在pmig_obj_r中，以literal为root_l的node为root，获得一个n_leaves割集，然后对该割集进行exact synthesis
 
@@ -625,23 +761,21 @@ class PMIG_operator:
 
         sat_flag: bool - 是否可优化
 
-        new_pmig: PMIG - 优化后的割集PMIG
-
         optimized_mig_obj: PMIG - 对割集进行优化后的图
 
-        n_maj_compare: tuple - (优化前割集的MAJ数目, 优化后割集的MAJ数目)
+        n_maj_compare: tuple - (优化前的MAJ数目, 优化后的MAJ数目)
 
-        new_literal_of_root: int - 割集root在新图中的literal（含属性）
-
-        info_tuple_cut:
-
-        info_tuple_model:
 
         :param pmig_obj_r:
         :param root_l:
         :param n_leaves:
         :return:
         '''
+
+        assert cut_computation_method in ('rec_driven', 'rec_driven_mfc')
+        assert if_allow_0contribution in (True, False)
+        optimized_mig_obj_clean = None
+        n_maj_compare = 0
 
         ####################################class
         class Map_for_ApplyOptiCut:
@@ -690,8 +824,12 @@ class PMIG_operator:
         assert isinstance(pmig_obj_r, PMIG)
 
         # 获得cut
-        cut_pmig_obj, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited = PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(
-            pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
+        if cut_computation_method == 'rec_driven_mfc':
+            cut_pmig_obj, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited = PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
+        elif cut_computation_method == 'rec_driven':
+            cut_pmig_obj, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited = PMIG_operator.op_get_n_cut_pmig_with_stop_list(pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
+        else:
+            assert False
         assert isinstance(cut_pmig_obj, PMIG)
         # 若cut大小为0,则直接返回
         if cut_pmig_obj.n_majs() == 0:
@@ -705,14 +843,19 @@ class PMIG_operator:
         func1, func2, pflag = pmigsimu_obj.simu_for_exact_synthesis()
         # exact synthesis
         exsyn_obj = exact_synthesis.PMIG_Cut_ExactSynthesis(func1=func1, func2=func2, allow_polymorphic=pflag)
-        sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(
-            upper_limit_n=cut_pmig_obj.n_majs(), echo_mode=False)
+
+        if if_allow_0contribution:
+            sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs(), echo_mode=False)
+        else:
+            sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(upper_limit_n=cut_pmig_obj.n_majs() - 1, echo_mode=False)
+
 
         # 应用优化后的cut
         if sat_flag:
+        # if True:
             # print
             # print("发现可优化的割集：root = {}, 原割集大小 = {}, 优化后的割集大小 = {}".format(root_l, cut_pmig_obj.n_majs(), new_pmig.n_majs()))
-            n_maj_compare = (cut_pmig_obj.n_majs(), new_pmig.n_majs())
+            # n_maj_compare = (cut_pmig_obj.n_majs(), new_pmig.n_majs())
             # 功能验证
             new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
             new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
@@ -724,13 +867,13 @@ class PMIG_operator:
             # 应用
             optimized_mig_obj = PMIG(name=pmig_obj_r.attr_get_pmig_name(), polymorphic_type=pmig_obj_r.attr_ptype_get())
             # 原图中可被直接删除的nodes，即割集中除去root和leaves以外的其它所有nodes。
-            list_nodes_to_be_deleted = []
-            for ii_l in nodeset_visited:
-                if (ii_l not in nodeset_leaves) and (ii_l != root_l):
-                    list_nodes_to_be_deleted.append(ii_l)
+            # list_nodes_to_be_deleted = []
+            # for ii_l in nodeset_visited:
+            #     if (ii_l not in nodeset_leaves) and (ii_l != root_l):
+            #         list_nodes_to_be_deleted.append(ii_l)
             # print(list_nodes_to_be_deleted,"***")
             # literal映射字典
-            map_dict = Map_for_ApplyOptiCut(deleted_literal=list_nodes_to_be_deleted, map_cut_pi=cut_map_pi)
+            map_dict = Map_for_ApplyOptiCut(deleted_literal=[], map_cut_pi=cut_map_pi)
 
             # cut po在原图中的literal，即root_l
             po_literal_old = cut_map_po[1]
@@ -766,7 +909,11 @@ class PMIG_operator:
                             assert (new_pmig.is_const0(f=ii_cut_l)) or (new_pmig.is_pi(f=ii_cut_l))
 
                     # assert ii_cut_l == cut_map_po[0]
-                    assert ii_cut_l == PMIG.get_noattribute_literal(new_pmig.get_po_fanin(po=0))
+                    if ii_cut_l != PMIG.get_noattribute_literal(new_pmig.get_po_fanin(po=0)):
+                        print(new_pmig)
+                        print(ii_cut_l)
+                        print(new_pmig.get_po_fanin(po=0))
+                    assert ( ii_cut_l == PMIG.get_noattribute_literal(new_pmig.get_po_fanin(po=0)) ) or (new_pmig.n_majs() == 0)
 
                     newnode_l_withattr = newnode_l
                     if model_po[1]:
@@ -780,7 +927,8 @@ class PMIG_operator:
 
 
                 elif pmig_obj_r.is_maj(f=ii_l):
-                    if (ii_l not in list_nodes_to_be_deleted) and (ii_l != po_literal_old):
+                    # if (ii_l not in list_nodes_to_be_deleted) and (ii_l != po_literal_old):
+                    if ii_l != po_literal_old:
                         ch0_l_old = pmig_obj_r.get_maj_child0(f=ii_l)
                         ch1_l_old = pmig_obj_r.get_maj_child1(f=ii_l)
                         ch2_l_old = pmig_obj_r.get_maj_child2(f=ii_l)
@@ -804,20 +952,232 @@ class PMIG_operator:
                 new_po_name = pmig_obj_r.get_name_by_po(po=ii_po_id)
                 optimized_mig_obj.create_po(f=new_po_fanin, name=new_po_name, po_type=ii_po_type)
 
+            assert PMIG_operator._function_verification_random(mig_obj_1=copy.deepcopy(pmig_obj_r), mig_obj_2=copy.deepcopy(optimized_mig_obj), n_random_veri=10)
+            optimized_mig_obj_clean = optimized_mig_obj.pmig_clean_irrelevant_nodes()
+            n_maj_compare = (pmig_obj_r.n_majs(), optimized_mig_obj_clean.n_majs())
+            assert PMIG_operator._function_verification_random(mig_obj_1=copy.deepcopy(pmig_obj_r), mig_obj_2=copy.deepcopy(optimized_mig_obj_clean),n_random_veri=10)
+            print('pass')
 
-        else:
-            new_pmig = None
-            optimized_mig_obj = None
-            n_maj_compare = 0
-            new_literal_of_root = None
-            info_tuple_cut = None
-            info_tuple_model = None
+        # info_tuple_model = (copy.deepcopy(model_nodes_list), copy.deepcopy(model_po))
+        # info_tuple_cut = (copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves),copy.deepcopy(nodeset_visited))
 
-        info_tuple_model = (copy.deepcopy(model_nodes_list), copy.deepcopy(model_po))
-        info_tuple_cut = (
-        copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves), copy.deepcopy(nodeset_visited))
-        return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(
-            optimized_mig_obj), n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model
+
+            if ( ( optimized_mig_obj_clean.n_majs() > pmig_obj_r.n_majs() ) and if_allow_0contribution ) or ( ( optimized_mig_obj_clean.n_majs() >= pmig_obj_r.n_majs() ) and (not if_allow_0contribution) ):
+                sat_flag = False
+                optimized_mig_obj_clean = None
+                n_maj_compare = 0
+
+
+        return sat_flag, copy.deepcopy(optimized_mig_obj_clean), n_maj_compare
+
+
+
+
+
+    # @staticmethod
+    # def op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r, root_l, n_leaves):
+    #     '''
+    #     与op_cut_exact_synthesis_size不同的是，该方法将允许0优化的替换。
+    #
+    #     在pmig_obj_r中，以literal为root_l的node为root，获得一个n_leaves割集，然后对该割集进行exact synthesis
+    #
+    #     return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(optimized_mig_obj), n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model
+    #
+    #     sat_flag: bool - 是否可优化
+    #
+    #     new_pmig: PMIG - 优化后的割集PMIG
+    #
+    #     optimized_mig_obj: PMIG - 对割集进行优化后的图
+    #
+    #     n_maj_compare: tuple - (优化前割集的MAJ数目, 优化后割集的MAJ数目)
+    #
+    #     new_literal_of_root: int - 割集root在新图中的literal（含属性）
+    #
+    #     info_tuple_cut:
+    #
+    #     info_tuple_model:
+    #
+    #     :param pmig_obj_r:
+    #     :param root_l:
+    #     :param n_leaves:
+    #     :return:
+    #     '''
+    #
+    #     ####################################class
+    #     class Map_for_ApplyOptiCut:
+    #         '''
+    #         用于将PMIG的cut替换为优化后的cut
+    #         '''
+    #
+    #         def __init__(self, deleted_literal, map_cut_pi):
+    #             self._dict_literal_old_to_new = {PMIG.get_literal_const0(): PMIG.get_literal_const0()}
+    #             self._dict_literal_cut_to_old = copy.deepcopy(map_cut_pi)
+    #             self._dict_literal_cut_to_new = {}
+    #             self._deleted_literal = copy.deepcopy(deleted_literal)
+    #
+    #         def map_literal_old_to_new(self, l_old, l_new):
+    #             assert PMIG.is_noattribute_literal(f=l_old)
+    #             assert l_old not in self._dict_literal_old_to_new
+    #             assert l_old not in self._deleted_literal
+    #             self._dict_literal_old_to_new[l_old] = l_new
+    #
+    #         def get_new_literal_of_old(self, l_old):
+    #             l_old_noattr = PMIG.get_noattribute_literal(f=l_old)
+    #             assert l_old_noattr in self._dict_literal_old_to_new
+    #             assert l_old_noattr not in self._deleted_literal
+    #             l_new_noattr = self._dict_literal_old_to_new[l_old_noattr]
+    #             l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_old)
+    #             return l_new
+    #
+    #         def map_literal_cut_to_new(self, l_cut, l_new):
+    #             assert PMIG.is_noattribute_literal(f=l_cut)
+    #             assert l_cut not in self._dict_literal_cut_to_new
+    #             self._dict_literal_cut_to_new[l_cut] = l_new
+    #
+    #         def get_new_literal_of_cut(self, l_cut):
+    #             l_cut_noattr = PMIG.get_noattribute_literal(f=l_cut)
+    #             if l_cut_noattr in self._dict_literal_cut_to_old:
+    #                 l_old_noattr = self._dict_literal_cut_to_old[l_cut_noattr]
+    #                 l_old = PMIG.add_attr_if_has_attr(f=l_old_noattr, c=l_cut)
+    #                 return self.get_new_literal_of_old(l_old=l_old)
+    #             else:
+    #                 assert l_cut_noattr in self._dict_literal_cut_to_new
+    #                 l_new_noattr = self._dict_literal_cut_to_new[l_cut_noattr]
+    #                 l_new = PMIG.add_attr_if_has_attr(f=l_new_noattr, c=l_cut)
+    #                 return l_new
+    #
+    #     ####################################main
+    #     assert isinstance(pmig_obj_r, PMIG)
+    #
+    #     # 获得cut
+    #     cut_pmig_obj, cut_map_pi, cut_map_po, nodeset_leaves, nodeset_visited = PMIG_operator.op_get_n_cut_pmig_with_multifanout_checks(
+    #         pmig_obj_r=copy.deepcopy(pmig_obj_r), root_l=root_l, n=n_leaves)
+    #     assert isinstance(cut_pmig_obj, PMIG)
+    #     # 若cut大小为0,则直接返回
+    #     if cut_pmig_obj.n_majs() == 0:
+    #         return False, None, None, None, None, None, None
+    #
+    #     # print("**********")
+    #     # print(nodeset_leaves)
+    #     # print(nodeset_visited)
+    #     # 获得cut功能
+    #     pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=cut_pmig_obj)
+    #     func1, func2, pflag = pmigsimu_obj.simu_for_exact_synthesis()
+    #     # exact synthesis
+    #     exsyn_obj = exact_synthesis.PMIG_Cut_ExactSynthesis(func1=func1, func2=func2, allow_polymorphic=pflag)
+    #     sat_flag, model_nodes_list, model_po, new_pmig = exsyn_obj.search_minimum_mig(
+    #         upper_limit_n=cut_pmig_obj.n_majs(), echo_mode=False)
+    #
+    #     # 应用优化后的cut
+    #     if sat_flag:
+    #         # print
+    #         # print("发现可优化的割集：root = {}, 原割集大小 = {}, 优化后的割集大小 = {}".format(root_l, cut_pmig_obj.n_majs(), new_pmig.n_majs()))
+    #         n_maj_compare = (cut_pmig_obj.n_majs(), new_pmig.n_majs())
+    #         # 功能验证
+    #         new_pmigsimu_obj = pmig_logic.PMIG_LogicSimu_Comb(pmig_obj_r=copy.deepcopy(new_pmig))
+    #         new_func1, new_func2, new_pflag = new_pmigsimu_obj.simu_for_exact_synthesis()
+    #         # print(new_func1)
+    #         # print(func1)
+    #         assert new_func1 == func1
+    #         assert new_func2 == func2
+    #
+    #         # 应用
+    #         optimized_mig_obj = PMIG(name=pmig_obj_r.attr_get_pmig_name(), polymorphic_type=pmig_obj_r.attr_ptype_get())
+    #         # 原图中可被直接删除的nodes，即割集中除去root和leaves以外的其它所有nodes。
+    #         list_nodes_to_be_deleted = []
+    #         for ii_l in nodeset_visited:
+    #             if (ii_l not in nodeset_leaves) and (ii_l != root_l):
+    #                 list_nodes_to_be_deleted.append(ii_l)
+    #         # print(list_nodes_to_be_deleted,"***")
+    #         # literal映射字典
+    #         map_dict = Map_for_ApplyOptiCut(deleted_literal=list_nodes_to_be_deleted, map_cut_pi=cut_map_pi)
+    #
+    #         # cut po在原图中的literal，即root_l
+    #         po_literal_old = cut_map_po[1]
+    #
+    #         # 开始映射
+    #         for ii_l in pmig_obj_r.get_iter_nodes_all():
+    #             if pmig_obj_r.has_name(f=ii_l):
+    #                 newnode_name = pmig_obj_r.get_name_by_id(f=ii_l)
+    #             else:
+    #                 newnode_name = None
+    #
+    #             if pmig_obj_r.is_const0(f=ii_l):
+    #                 assert ii_l == PMIG.get_literal_const0()
+    #
+    #             elif pmig_obj_r.is_pi(f=ii_l):
+    #                 newnode_l = optimized_mig_obj.create_pi(name=newnode_name)
+    #                 map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
+    #
+    #             elif ii_l == po_literal_old:
+    #                 for ii_cut_l in new_pmig.get_iter_nodes_all():
+    #                     if new_pmig.is_maj(f=ii_cut_l):
+    #                         ch0_l_cut = new_pmig.get_maj_child0(f=ii_cut_l)
+    #                         ch1_l_cut = new_pmig.get_maj_child1(f=ii_cut_l)
+    #                         ch2_l_cut = new_pmig.get_maj_child2(f=ii_cut_l)
+    #
+    #                         ch0_l_new = map_dict.get_new_literal_of_cut(l_cut=ch0_l_cut)
+    #                         ch1_l_new = map_dict.get_new_literal_of_cut(l_cut=ch1_l_cut)
+    #                         ch2_l_new = map_dict.get_new_literal_of_cut(l_cut=ch2_l_cut)
+    #
+    #                         newnode_l = optimized_mig_obj.create_maj(child0=ch0_l_new, child1=ch1_l_new, child2=ch2_l_new)
+    #                         map_dict.map_literal_cut_to_new(l_cut=ii_cut_l, l_new=newnode_l)
+    #                     else:
+    #                         assert (new_pmig.is_const0(f=ii_cut_l)) or (new_pmig.is_pi(f=ii_cut_l))
+    #
+    #                 # assert ii_cut_l == cut_map_po[0]
+    #                 assert ii_cut_l == PMIG.get_noattribute_literal(new_pmig.get_po_fanin(po=0))
+    #
+    #                 newnode_l_withattr = newnode_l
+    #                 if model_po[1]:
+    #                     newnode_l_withattr = newnode_l_withattr + 1
+    #                 if model_po[2]:
+    #                     newnode_l_withattr = newnode_l_withattr + 2
+    #
+    #                 map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l_withattr)
+    #                 new_literal_of_root = newnode_l_withattr
+    #
+    #
+    #
+    #             elif pmig_obj_r.is_maj(f=ii_l):
+    #                 if (ii_l not in list_nodes_to_be_deleted) and (ii_l != po_literal_old):
+    #                     ch0_l_old = pmig_obj_r.get_maj_child0(f=ii_l)
+    #                     ch1_l_old = pmig_obj_r.get_maj_child1(f=ii_l)
+    #                     ch2_l_old = pmig_obj_r.get_maj_child2(f=ii_l)
+    #
+    #                     ch0_l_new = map_dict.get_new_literal_of_old(l_old=ch0_l_old)
+    #                     # print(ch1_l_old)
+    #                     ch1_l_new = map_dict.get_new_literal_of_old(l_old=ch1_l_old)
+    #                     ch2_l_new = map_dict.get_new_literal_of_old(l_old=ch2_l_old)
+    #
+    #                     newnode_l = optimized_mig_obj.create_maj(child0=ch0_l_new, child1=ch1_l_new, child2=ch2_l_new)
+    #                     map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l)
+    #                     if newnode_name != None:
+    #                         optimized_mig_obj.set_name(f=newnode_l, name=newnode_name)
+    #             else:
+    #                 assert False
+    #
+    #         for ii_po_id, ii_po_fanin, ii_po_type in pmig_obj_r.get_iter_pos():
+    #             # print(ii_po_fanin)
+    #             # print(map_dict._dict_literal_old_to_new)
+    #             new_po_fanin = map_dict.get_new_literal_of_old(l_old=ii_po_fanin)
+    #             new_po_name = pmig_obj_r.get_name_by_po(po=ii_po_id)
+    #             optimized_mig_obj.create_po(f=new_po_fanin, name=new_po_name, po_type=ii_po_type)
+    #
+    #
+    #     else:
+    #         new_pmig = None
+    #         optimized_mig_obj = None
+    #         n_maj_compare = 0
+    #         new_literal_of_root = None
+    #         info_tuple_cut = None
+    #         info_tuple_model = None
+    #
+    #     info_tuple_model = (copy.deepcopy(model_nodes_list), copy.deepcopy(model_po))
+    #     info_tuple_cut = (
+    #     copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves), copy.deepcopy(nodeset_visited))
+    #     return sat_flag, copy.deepcopy(new_pmig), copy.deepcopy(
+    #         optimized_mig_obj), n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model
 
 
 ########################################################################################################################
@@ -1117,26 +1477,106 @@ class PMIG_optimization:
             print("ROUND {}".format(cnt_round))
             flag_continue = False
             maj_list = list(current_pmig_obj.get_iter_majs())
-            last_optimized_root_l = None # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
             for ii_maj_l in maj_list[::-1]:
-                if (last_optimized_root_l == None) or ( (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l) ):
+                if (not flag_continue):
                     # print("Node {}".format(ii_maj_l))
-                    sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
-                        = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l, n_leaves=n_leaves)
+                    sat_flag, optimized_mig_obj, n_maj_compare \
+                        = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+                                                                    root_l=ii_maj_l,
+                                                                    n_leaves=n_leaves,
+                                                                    cut_computation_method='rec_driven',
+                                                                    if_allow_0contribution=False)
                     if sat_flag:
                         flag_continue = True
-                        last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+                        # last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
                         current_pmig_obj = optimized_mig_obj
-                        print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l, n_maj_compare[0], n_maj_compare[1]))
+                        print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l, n_maj_compare[0],
+                                                                                  n_maj_compare[1]))
 
             cnt_round = cnt_round + 1
         self.update_current_pmig(new_pmig=current_pmig_obj)
+            # last_optimized_root_l = None # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
+        #     for ii_maj_l in maj_list[::-1]:
+        #         if (last_optimized_root_l == None) or ( (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l) ):
+        #             # print("Node {}".format(ii_maj_l))
+        #             sat_flag, optimized_mig_obj, n_maj_compare \
+        #                 = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+        #                                                             root_l=ii_maj_l,
+        #                                                             n_leaves=n_leaves,
+        #                                                             cut_computation_method='rec_driven',
+        #                                                             if_allow_0contribution=False)
+        #             if sat_flag:
+        #                 flag_continue = True
+        #                 last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+        #                 current_pmig_obj = optimized_mig_obj
+        #                 print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l, n_maj_compare[0], n_maj_compare[1]))
+        #
+        #     cnt_round = cnt_round + 1
+        # self.update_current_pmig(new_pmig=current_pmig_obj)
 
-    #######
+
+    # #######
+    # def opti_exact_synthesis_size_frompo_allow_0contribution(self, n_leaves):
+    #     '''
+    #     与opti_exact_synthesis_size_frompo不同的是，该方法允许0优化的替换。但是，是否继续下一轮仍然不考虑0优化的替换。
+    #
+    #     从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
+    #
+    #     :param n_leaves:
+    #     :return:
+    #     '''
+    #     # print('\n')
+    #     print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompo")
+    #
+    #     flag_continue = True
+    #     current_pmig_obj = self.get_current_pmig()
+    #     assert isinstance(current_pmig_obj, PMIG)
+    #     cnt_round = 1
+    #     cnt_0contri_only = 0 # 如果一轮中仅有0优化的替换，该变量加一。该变量用于指示是否连续几轮都是只有0优化的替换
+    #     while flag_continue or (cnt_0contri_only < 2):
+    #         print("ROUND {}, cnt:{}".format(cnt_round, cnt_0contri_only))
+    #         flag_continue = False
+    #         maj_list = list(current_pmig_obj.get_iter_majs())
+    #         last_optimized_root_l = None  # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
+    #         for ii_maj_l in maj_list[::-1]:
+    #             if (last_optimized_root_l == None) or (
+    #                     (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l)):
+    #                 # print("Node {}".format(ii_maj_l))
+    #                 # if cnt_0contri_only == 0:
+    #                 #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+    #                 #         = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
+    #                 #                                                                         n_leaves=n_leaves)
+    #                 # else:
+    #                 #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+    #                 #         = PMIG_operator.op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
+    #                 #                                                     n_leaves=n_leaves)
+    #                 sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+    #                     = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+    #                                                                                     root_l=ii_maj_l,
+    #                                                                                     n_leaves=n_leaves,
+    #                                                                                     cut_computation_method='rec_driven',
+    #                                                                                     if_allow_0contribution=True)
+    #                 if sat_flag:
+    #                     assert n_maj_compare[0] >= n_maj_compare[1]
+    #                     if n_maj_compare[0] > n_maj_compare[1]:
+    #                         flag_continue = True
+    #                         print("-------- Positive optimization! ------->")
+    #                     last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+    #                     current_pmig_obj = optimized_mig_obj
+    #                     print("Round {}, Root {} - 已替换，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,
+    #                                                                               n_maj_compare[0],
+    #                                                                               n_maj_compare[1]))
+    #
+    #         if flag_continue:
+    #             cnt_0contri_only = 0
+    #         else:
+    #             cnt_0contri_only = cnt_0contri_only + 1
+    #         cnt_round = cnt_round + 1
+    #     self.update_current_pmig(new_pmig=current_pmig_obj)
+
+#######
     def opti_exact_synthesis_size_frompo_allow_0contribution(self, n_leaves):
         '''
-        与opti_exact_synthesis_size_frompo不同的是，该方法允许0优化的替换。但是，是否继续下一轮仍然不考虑0优化的替换。
-
         从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
 
         :param n_leaves:
@@ -1145,47 +1585,38 @@ class PMIG_optimization:
         # print('\n')
         print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompo")
 
+        cnt_0opti = 0
+        max_0opti = 2
         flag_continue = True
         current_pmig_obj = self.get_current_pmig()
         assert isinstance(current_pmig_obj, PMIG)
         cnt_round = 1
-        cnt_0contri_only = 0 # 如果一轮中仅有0优化的替换，该变量加一。该变量用于指示是否连续几轮都是只有0优化的替换
-        while flag_continue or (cnt_0contri_only < 2):
-            print("ROUND {}, cnt:{}".format(cnt_round, cnt_0contri_only))
+        while flag_continue or (cnt_0opti <= max_0opti):
+            cnt_0opti = cnt_0opti + 1
+            print("ROUND {}".format(cnt_round))
             flag_continue = False
             maj_list = list(current_pmig_obj.get_iter_majs())
-            last_optimized_root_l = None  # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
             for ii_maj_l in maj_list[::-1]:
-                if (last_optimized_root_l == None) or (
-                        (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l)):
+                if (not flag_continue):
                     # print("Node {}".format(ii_maj_l))
-                    # if cnt_0contri_only == 0:
-                    #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
-                    #         = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
-                    #                                                                         n_leaves=n_leaves)
-                    # else:
-                    #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
-                    #         = PMIG_operator.op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
-                    #                                                     n_leaves=n_leaves)
-                    sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
-                        = PMIG_operator.op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r=current_pmig_obj,
-                                                                                        root_l=ii_maj_l,
-                                                                                        n_leaves=n_leaves)
+                    sat_flag, optimized_mig_obj, n_maj_compare \
+                        = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+                                                                    root_l=ii_maj_l,
+                                                                    n_leaves=n_leaves,
+                                                                    cut_computation_method='rec_driven',
+                                                                    if_allow_0contribution=True)
                     if sat_flag:
-                        assert n_maj_compare[0] >= n_maj_compare[1]
                         if n_maj_compare[0] > n_maj_compare[1]:
+                            cnt_0opti = 0
                             flag_continue = True
-                            print("-------- Positive optimization! ------->")
-                        last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+                        else:
+                            assert n_maj_compare[0] == n_maj_compare[1]
+                        # last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
                         current_pmig_obj = optimized_mig_obj
-                        print("Round {}, Root {} - 已替换，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,
+                        print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,
                                                                                   n_maj_compare[0],
                                                                                   n_maj_compare[1]))
 
-            if flag_continue:
-                cnt_0contri_only = 0
-            else:
-                cnt_0contri_only = cnt_0contri_only + 1
             cnt_round = cnt_round + 1
         self.update_current_pmig(new_pmig=current_pmig_obj)
 
