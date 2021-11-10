@@ -909,17 +909,23 @@ class PMIG_operator:
                             assert (new_pmig.is_const0(f=ii_cut_l)) or (new_pmig.is_pi(f=ii_cut_l))
 
                     # assert ii_cut_l == cut_map_po[0]
-                    if ii_cut_l != PMIG.get_noattribute_literal(new_pmig.get_po_fanin(po=0)):
-                        print(new_pmig)
-                        print(ii_cut_l)
-                        print(new_pmig.get_po_fanin(po=0))
+                    # if ii_cut_l != PMIG.get_noattribute_literal(new_pmig.get_po_fanin(po=0)):
+                    #     print(new_pmig)
+                    #     print(ii_cut_l)
+                    #     print(new_pmig.get_po_fanin(po=0))
                     assert ( ii_cut_l == PMIG.get_noattribute_literal(new_pmig.get_po_fanin(po=0)) ) or (new_pmig.n_majs() == 0)
 
-                    newnode_l_withattr = newnode_l
+                    if new_pmig.n_majs() == 0:
+                        newnode_l_withattr = cut_map_pi[model_po[0] << 2]
+                        print("发现可消除的割集，root_l={}".format(root_l))
+                    else:
+                        newnode_l_withattr = newnode_l
                     if model_po[1]:
-                        newnode_l_withattr = newnode_l_withattr + 1
+                        newnode_l_withattr = PMIG.negate_literal_if(f=newnode_l_withattr, c=True)
+                        # newnode_l_withattr = newnode_l_withattr + 1
                     if model_po[2]:
-                        newnode_l_withattr = newnode_l_withattr + 2
+                        newnode_l_withattr = PMIG.polymorphic_literal_if(f=newnode_l_withattr, c=True)
+                        # newnode_l_withattr = newnode_l_withattr + 2
 
                     map_dict.map_literal_old_to_new(l_old=ii_l, l_new=newnode_l_withattr)
                     new_literal_of_root = newnode_l_withattr
@@ -952,11 +958,13 @@ class PMIG_operator:
                 new_po_name = pmig_obj_r.get_name_by_po(po=ii_po_id)
                 optimized_mig_obj.create_po(f=new_po_fanin, name=new_po_name, po_type=ii_po_type)
 
-            assert PMIG_operator._function_verification_random(mig_obj_1=copy.deepcopy(pmig_obj_r), mig_obj_2=copy.deepcopy(optimized_mig_obj), n_random_veri=10)
+            # assert PMIG_operator._function_verification_random(mig_obj_1=copy.deepcopy(pmig_obj_r), mig_obj_2=copy.deepcopy(optimized_mig_obj), n_random_veri=10)
             optimized_mig_obj_clean = optimized_mig_obj.pmig_clean_irrelevant_nodes()
             n_maj_compare = (pmig_obj_r.n_majs(), optimized_mig_obj_clean.n_majs())
+
+            # 注意：下面这条断言用于debug，不需要时可删除，以加快速度。
             assert PMIG_operator._function_verification_random(mig_obj_1=copy.deepcopy(pmig_obj_r), mig_obj_2=copy.deepcopy(optimized_mig_obj_clean),n_random_veri=10)
-            print('pass')
+            # print('pass')
 
         # info_tuple_model = (copy.deepcopy(model_nodes_list), copy.deepcopy(model_po))
         # info_tuple_cut = (copy.deepcopy(cut_map_pi), copy.deepcopy(cut_map_po), copy.deepcopy(nodeset_leaves),copy.deepcopy(nodeset_visited))
