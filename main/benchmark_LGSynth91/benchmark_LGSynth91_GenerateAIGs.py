@@ -1,8 +1,10 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @Time    : 2021/11/05
+# @Time    : 2021/11/11
 # @Author  : c
-# @File    : benchmark_LGSynth91.py
+# @File    : benchmark_LGSynth91_GenerateAIGs.py
+#
+# 用于生成LGSynth91 benchmark所需的AIG文件。
 
 import sys
 import copy

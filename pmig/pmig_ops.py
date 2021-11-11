@@ -833,7 +833,7 @@ class PMIG_operator:
         assert isinstance(cut_pmig_obj, PMIG)
         # 若cut大小为0,则直接返回
         if cut_pmig_obj.n_majs() == 0:
-            return False, None, None, None, None, None, None
+            return False, None, None
 
         # print("**********")
         # print(nodeset_leaves)
@@ -1467,7 +1467,7 @@ class PMIG_optimization:
         self.update_current_pmig(new_pmig=new_pmig, random_veri=random_veri)
 
 #######
-    def opti_exact_synthesis_size_frompo(self, n_leaves):
+    def opti_exact_synthesis_size_frompo(self, n_leaves, cut_computation_method = 'rec_driven'):
         '''
         从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
 
@@ -1492,7 +1492,7 @@ class PMIG_optimization:
                         = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
                                                                     root_l=ii_maj_l,
                                                                     n_leaves=n_leaves,
-                                                                    cut_computation_method='rec_driven',
+                                                                    cut_computation_method=cut_computation_method,
                                                                     if_allow_0contribution=False)
                     if sat_flag:
                         flag_continue = True
@@ -1583,7 +1583,7 @@ class PMIG_optimization:
     #     self.update_current_pmig(new_pmig=current_pmig_obj)
 
 #######
-    def opti_exact_synthesis_size_frompo_allow_0contribution(self, n_leaves):
+    def opti_exact_synthesis_size_frompo_allow_0contribution(self, n_leaves, cut_computation_method = 'rec_driven'):
         '''
         从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
 
@@ -1611,7 +1611,7 @@ class PMIG_optimization:
                         = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
                                                                     root_l=ii_maj_l,
                                                                     n_leaves=n_leaves,
-                                                                    cut_computation_method='rec_driven',
+                                                                    cut_computation_method=cut_computation_method,
                                                                     if_allow_0contribution=True)
                     if sat_flag:
                         if n_maj_compare[0] > n_maj_compare[1]:
