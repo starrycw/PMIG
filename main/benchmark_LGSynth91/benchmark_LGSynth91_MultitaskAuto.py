@@ -15,7 +15,7 @@ import pmig.graphs
 sys.path.append("..")
 import global_vars as g_vars
 g_vars._init()
-from pmig import convert_to_graph
+# from pmig import convert_to_graph
 from pmig import graphs
 from pmig import graphs_io
 from pmig import pmig_ops
@@ -146,23 +146,33 @@ for task_to_be_exec in list_tasks_to_be_exec:
 
     # 优化策略
     if task_opti_method == 'size_default':
+        cnt_opti_cycle = 0
         flag_continue = True
         while flag_continue:
+            cnt_opti_cycle = cnt_opti_cycle + 1
             flag_continue = False
             temp_current_pmig_obj = opti_obj.get_current_pmig()
             assert isinstance(temp_current_pmig_obj, graphs.PMIG)
             temp_current_pmig_size = temp_current_pmig_obj.n_majs()
 
             # 每轮执行的操作
+            print("############################################################################################")
+            print('TASK {}, Cycle {}, rec_driven'.format(task_to_be_exec, cnt_opti_cycle))
             opti_obj.opti_exact_synthesis_size_frompo(n_leaves=task_n_leaves, cut_computation_method='rec_driven')
             opti_obj.opti_clean_irrelevant_nodes()
 
+            print("############################################################################################")
+            print('TASK {}, Cycle {}, rec_driven, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
             opti_obj.opti_exact_synthesis_size_frompo_allow_0contribution(n_leaves=task_n_leaves, cut_computation_method='rec_driven')
             opti_obj.opti_clean_irrelevant_nodes()
 
+            print("############################################################################################")
+            print('TASK {}, Cycle {}, rec_driven_mfc'.format(task_to_be_exec, cnt_opti_cycle))
             opti_obj.opti_exact_synthesis_size_frompo(n_leaves=task_n_leaves, cut_computation_method='rec_driven_mfc')
             opti_obj.opti_clean_irrelevant_nodes()
 
+            print("############################################################################################")
+            print('TASK {}, Cycle {}, rec_driven_mfc, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
             opti_obj.opti_exact_synthesis_size_frompo_allow_0contribution(n_leaves=task_n_leaves, cut_computation_method='rec_driven_mfc')
             opti_obj.opti_clean_irrelevant_nodes()
 
@@ -170,6 +180,8 @@ for task_to_be_exec in list_tasks_to_be_exec:
             temp_new_pmig_obj = opti_obj.get_current_pmig()
             assert isinstance(temp_new_pmig_obj, graphs.PMIG)
             temp_new_pmig_size = temp_new_pmig_obj.n_majs()
+            print("############################################################################################")
+            print("Cycle {} finished! MIG nodes: {} -> {}".format(cnt_opti_cycle, temp_current_pmig_size, temp_new_pmig_size))
             if temp_new_pmig_size < temp_current_pmig_size:
                 flag_continue = True
             else:
