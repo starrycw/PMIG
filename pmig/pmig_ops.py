@@ -963,7 +963,7 @@ class PMIG_operator:
             n_maj_compare = (pmig_obj_r.n_majs(), optimized_mig_obj_clean.n_majs())
 
             # 注意：下面这条断言用于debug，不需要时可删除，以加快速度。
-            assert PMIG_operator._function_verification_random(mig_obj_1=copy.deepcopy(pmig_obj_r), mig_obj_2=copy.deepcopy(optimized_mig_obj_clean),n_random_veri=10)
+            # assert PMIG_operator._function_verification_random(mig_obj_1=copy.deepcopy(pmig_obj_r), mig_obj_2=copy.deepcopy(optimized_mig_obj_clean),n_random_veri=10)
             # print('pass')
 
         # info_tuple_model = (copy.deepcopy(model_nodes_list), copy.deepcopy(model_po))

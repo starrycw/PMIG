@@ -88,7 +88,7 @@ for task_to_be_exec in list_tasks_to_be_exec:
     path_aiger_dir = g_vars.get_value("path_aiger_dir")
 
     # 生成存储结果的文件夹
-    path_abc_resultdir = '{}/result'.format(path_abc_srcdir)
+    path_abc_resultdir = g_vars.get_value("path_srcdir") + "/LGSynth91/result/C{}".format(task_id)
     if not (os.path.exists(path_abc_resultdir)):
         os.makedirs(path_abc_resultdir)
 

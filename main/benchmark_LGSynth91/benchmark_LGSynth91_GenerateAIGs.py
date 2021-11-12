@@ -57,7 +57,7 @@ for pg_task_id in range(0, 15):
     for sub_id in (0, 1):
         print("Sub-graph {}: ".format(sub_id))
         path_abc_srcfile = pg_task[sub_id]
-        status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ('strash', 'rewrite', 'rewrite', 'rewrite', 'rewrite', 'rewrite', 'rewrite'), echo_mode=1)
+        status, warnings = convert_to_graph.convert_to_aiger(path_abc_srcdir, path_abc_srcfile, path_aiger_dir, ('strash', 'resyn2', 'resyn2', 'resyn2', 'resyn2', 'resyn2', 'resyn2', 'resyn2', 'resyn2', 'resyn2', 'resyn2'), echo_mode=1)
         if status != 0:
             assert False
         print(warnings)

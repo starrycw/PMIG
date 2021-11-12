@@ -93,6 +93,19 @@ def convert_to_aiger(abc_srcdir, abc_srcfile, aiger_dir, abc_ops = ("strash", "r
                         status, msg = abc("print_stats")
                         print("[INFO] abc: Rewriting performed! Current state: \n" + msg)
 
+            # alias resyn2      "b; rw; rf; b; rw; rwz; b; rfz; rwz; b"
+            elif op == "resyn2":
+                status, msg = abc('balance; rewrite; refactor; balance; rewrite; rewrite -z; balance; refactor -z; rewrite -z; balance')
+                if status != 0:
+                    raise ReturnCodeError("abc: " + msg)
+                else:
+                    if echo_mode > 1:
+                        status, msg = abc("print_stats")
+                        print("[INFO] abc: resyn2 performed! Current state: \n" + msg)
+
+
+
+
             # abc: Undefined op
             else:
                 if echo_mode > 0:
