@@ -1256,10 +1256,13 @@ class PMIG_optimization:
 
         for ii_random in range(0, n_random_veri):
             vec_max = pow(2, pi_len)
-            vec_value = random.randint(0, vec_max)
+            vec_value = random.randint(0, vec_max-1)
             vec_bin = bin(vec_value)[2:]
             vec_tuple = tuple(str.zfill(vec_bin, pi_len))
             # print(len(vec_tuple), pi_len, latch_len)
+            if len(vec_tuple) != pi_len:
+                print(len(vec_tuple))
+                print(pi_len)
             assert len(vec_tuple) == pi_len
             vec_pi_tuple = vec_tuple[:pi_len]
             pi_vec = []
