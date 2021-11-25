@@ -36,7 +36,7 @@ list_tasks_to_be_exec = (
 )
 
 # 在这里设置随机验证的数量
-task_n_random_veri = 20
+task_n_random_veri = 50
 
 
 ################################################
@@ -155,7 +155,28 @@ for task_to_be_exec in list_tasks_to_be_exec:
             assert isinstance(temp_current_pmig_obj, graphs.PMIG)
             temp_current_pmig_size = temp_current_pmig_obj.n_majs()
 
-            # 每轮执行的操作
+            # 每轮执行的操作 PI-PO
+            print("############################################################################################")
+            print('TASK {}, Cycle {}, rec_driven'.format(task_to_be_exec, cnt_opti_cycle))
+            opti_obj.opti_exact_synthesis_size_frompi(n_leaves=task_n_leaves, cut_computation_method='rec_driven')
+            opti_obj.opti_clean_irrelevant_nodes()
+
+            print("############################################################################################")
+            print('TASK {}, Cycle {}, rec_driven, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
+            opti_obj.opti_exact_synthesis_size_frompi_allow_0contribution(n_leaves=task_n_leaves, cut_computation_method='rec_driven')
+            opti_obj.opti_clean_irrelevant_nodes()
+
+            print("############################################################################################")
+            print('TASK {}, Cycle {}, rec_driven_mfc'.format(task_to_be_exec, cnt_opti_cycle))
+            opti_obj.opti_exact_synthesis_size_frompi(n_leaves=task_n_leaves, cut_computation_method='rec_driven_mfc')
+            opti_obj.opti_clean_irrelevant_nodes()
+
+            print("############################################################################################")
+            print('TASK {}, Cycle {}, rec_driven_mfc, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
+            opti_obj.opti_exact_synthesis_size_frompi_allow_0contribution(n_leaves=task_n_leaves, cut_computation_method='rec_driven_mfc')
+            opti_obj.opti_clean_irrelevant_nodes()
+
+            # 每轮执行的操作 PO-PI
             print("############################################################################################")
             print('TASK {}, Cycle {}, rec_driven'.format(task_to_be_exec, cnt_opti_cycle))
             opti_obj.opti_exact_synthesis_size_frompo(n_leaves=task_n_leaves, cut_computation_method='rec_driven')
@@ -163,7 +184,8 @@ for task_to_be_exec in list_tasks_to_be_exec:
 
             print("############################################################################################")
             print('TASK {}, Cycle {}, rec_driven, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompo_allow_0contribution(n_leaves=task_n_leaves, cut_computation_method='rec_driven')
+            opti_obj.opti_exact_synthesis_size_frompo_allow_0contribution(n_leaves=task_n_leaves,
+                                                                          cut_computation_method='rec_driven')
             opti_obj.opti_clean_irrelevant_nodes()
 
             print("############################################################################################")
@@ -173,7 +195,8 @@ for task_to_be_exec in list_tasks_to_be_exec:
 
             print("############################################################################################")
             print('TASK {}, Cycle {}, rec_driven_mfc, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompo_allow_0contribution(n_leaves=task_n_leaves, cut_computation_method='rec_driven_mfc')
+            opti_obj.opti_exact_synthesis_size_frompo_allow_0contribution(n_leaves=task_n_leaves,
+                                                                          cut_computation_method='rec_driven_mfc')
             opti_obj.opti_clean_irrelevant_nodes()
 
             # 检查这一轮是否有优化

@@ -66,7 +66,7 @@ class PMIG_operator:
 
         for ii_random in range(0, n_random_veri):
             vec_max = pow(2, pi_len)
-            vec_value = random.randint(0, vec_max)
+            vec_value = random.randint(0, vec_max-1)
             vec_bin = bin(vec_value)[2:]
             vec_tuple = tuple(str.zfill(vec_bin, pi_len))
             # print(len(vec_tuple), pi_len, latch_len)
@@ -1322,7 +1322,7 @@ class PMIG_optimization:
 
         for ii_random in range(0, n_random_veri):
             vec_max = pow(2, pi_len)
-            vec_value = random.randint(0, vec_max)
+            vec_value = random.randint(0, vec_max-1)
             vec_bin = bin(vec_value)[2:]
             vec_tuple = tuple(str.zfill(vec_bin, pi_len))
             # print(len(vec_tuple), pi_len, latch_len)
@@ -1632,9 +1632,330 @@ class PMIG_optimization:
         self.update_current_pmig(new_pmig=current_pmig_obj)
 
 
+#######
+    def opti_exact_synthesis_size_frompo(self, n_leaves, cut_computation_method = 'rec_driven'):
+        '''
+        从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
+
+        :param n_leaves:
+        :return:
+        '''
+        # print('\n')
+        print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompo")
+
+        flag_continue = True
+        current_pmig_obj = self.get_current_pmig()
+        assert isinstance(current_pmig_obj, PMIG)
+        cnt_round = 1
+        while flag_continue:
+            print("ROUND {}".format(cnt_round))
+            flag_continue = False
+            maj_list = list(current_pmig_obj.get_iter_majs())
+            for ii_maj_l in maj_list[::-1]:
+                if (not flag_continue):
+                    # print("Node {}".format(ii_maj_l))
+                    sat_flag, optimized_mig_obj, n_maj_compare \
+                        = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+                                                                    root_l=ii_maj_l,
+                                                                    n_leaves=n_leaves,
+                                                                    cut_computation_method=cut_computation_method,
+                                                                    if_allow_0contribution=False)
+                    if sat_flag:
+                        flag_continue = True
+                        # last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+                        current_pmig_obj = optimized_mig_obj
+                        print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l, n_maj_compare[0],
+                                                                                  n_maj_compare[1]))
+
+            cnt_round = cnt_round + 1
+        self.update_current_pmig(new_pmig=current_pmig_obj)
+            # last_optimized_root_l = None # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
+        #     for ii_maj_l in maj_list[::-1]:
+        #         if (last_optimized_root_l == None) or ( (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l) ):
+        #             # print("Node {}".format(ii_maj_l))
+        #             sat_flag, optimized_mig_obj, n_maj_compare \
+        #                 = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+        #                                                             root_l=ii_maj_l,
+        #                                                             n_leaves=n_leaves,
+        #                                                             cut_computation_method='rec_driven',
+        #                                                             if_allow_0contribution=False)
+        #             if sat_flag:
+        #                 flag_continue = True
+        #                 last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+        #                 current_pmig_obj = optimized_mig_obj
+        #                 print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l, n_maj_compare[0], n_maj_compare[1]))
+        #
+        #     cnt_round = cnt_round + 1
+        # self.update_current_pmig(new_pmig=current_pmig_obj)
 
 
+    # #######
+    # def opti_exact_synthesis_size_frompo_allow_0contribution(self, n_leaves):
+    #     '''
+    #     与opti_exact_synthesis_size_frompo不同的是，该方法允许0优化的替换。但是，是否继续下一轮仍然不考虑0优化的替换。
+    #
+    #     从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
+    #
+    #     :param n_leaves:
+    #     :return:
+    #     '''
+    #     # print('\n')
+    #     print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompo")
+    #
+    #     flag_continue = True
+    #     current_pmig_obj = self.get_current_pmig()
+    #     assert isinstance(current_pmig_obj, PMIG)
+    #     cnt_round = 1
+    #     cnt_0contri_only = 0 # 如果一轮中仅有0优化的替换，该变量加一。该变量用于指示是否连续几轮都是只有0优化的替换
+    #     while flag_continue or (cnt_0contri_only < 2):
+    #         print("ROUND {}, cnt:{}".format(cnt_round, cnt_0contri_only))
+    #         flag_continue = False
+    #         maj_list = list(current_pmig_obj.get_iter_majs())
+    #         last_optimized_root_l = None  # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
+    #         for ii_maj_l in maj_list[::-1]:
+    #             if (last_optimized_root_l == None) or (
+    #                     (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l)):
+    #                 # print("Node {}".format(ii_maj_l))
+    #                 # if cnt_0contri_only == 0:
+    #                 #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+    #                 #         = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
+    #                 #                                                                         n_leaves=n_leaves)
+    #                 # else:
+    #                 #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+    #                 #         = PMIG_operator.op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
+    #                 #                                                     n_leaves=n_leaves)
+    #                 sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+    #                     = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+    #                                                                                     root_l=ii_maj_l,
+    #                                                                                     n_leaves=n_leaves,
+    #                                                                                     cut_computation_method='rec_driven',
+    #                                                                                     if_allow_0contribution=True)
+    #                 if sat_flag:
+    #                     assert n_maj_compare[0] >= n_maj_compare[1]
+    #                     if n_maj_compare[0] > n_maj_compare[1]:
+    #                         flag_continue = True
+    #                         print("-------- Positive optimization! ------->")
+    #                     last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+    #                     current_pmig_obj = optimized_mig_obj
+    #                     print("Round {}, Root {} - 已替换，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,
+    #                                                                               n_maj_compare[0],
+    #                                                                               n_maj_compare[1]))
+    #
+    #         if flag_continue:
+    #             cnt_0contri_only = 0
+    #         else:
+    #             cnt_0contri_only = cnt_0contri_only + 1
+    #         cnt_round = cnt_round + 1
+    #     self.update_current_pmig(new_pmig=current_pmig_obj)
 
+#######
+    def opti_exact_synthesis_size_frompo_allow_0contribution(self, n_leaves, cut_computation_method = 'rec_driven'):
+        '''
+        从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
+
+        :param n_leaves:
+        :return:
+        '''
+        # print('\n')
+        print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompo")
+
+        cnt_0opti = -1
+        max_0opti = 2
+        flag_continue = True
+        current_pmig_obj = self.get_current_pmig()
+        assert isinstance(current_pmig_obj, PMIG)
+        cnt_round = 1
+        while flag_continue or (cnt_0opti <= max_0opti):
+            cnt_0opti = cnt_0opti + 1
+            print("ROUND {}, cnt_0opti={}".format(cnt_round, cnt_0opti))
+            flag_continue = False
+            maj_list = list(current_pmig_obj.get_iter_majs())
+            for ii_maj_l in maj_list[::-1]:
+                if (not flag_continue):
+                    # print("Node {}".format(ii_maj_l))
+                    sat_flag, optimized_mig_obj, n_maj_compare \
+                        = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+                                                                    root_l=ii_maj_l,
+                                                                    n_leaves=n_leaves,
+                                                                    cut_computation_method=cut_computation_method,
+                                                                    if_allow_0contribution=True)
+                    if sat_flag:
+                        if n_maj_compare[0] > n_maj_compare[1]:
+                            cnt_0opti = -1
+                            flag_continue = True
+                        else:
+                            assert n_maj_compare[0] == n_maj_compare[1]
+                        # last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+                        current_pmig_obj = optimized_mig_obj
+                        print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,
+                                                                                  n_maj_compare[0],
+                                                                                  n_maj_compare[1]))
+
+            cnt_round = cnt_round + 1
+        self.update_current_pmig(new_pmig=current_pmig_obj)
+
+
+#######
+    def opti_exact_synthesis_size_frompi(self, n_leaves, cut_computation_method = 'rec_driven'):
+        '''
+        从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
+
+        :param n_leaves:
+        :return:
+        '''
+        # print('\n')
+        print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompi")
+
+        flag_continue = True
+        current_pmig_obj = self.get_current_pmig()
+        assert isinstance(current_pmig_obj, PMIG)
+        cnt_round = 1
+        while flag_continue:
+            print("ROUND {}".format(cnt_round))
+            flag_continue = False
+            maj_list = list(current_pmig_obj.get_iter_majs())
+            for ii_maj_l in maj_list[::1]:
+                if (not flag_continue):
+                    # print("Node {}".format(ii_maj_l))
+                    sat_flag, optimized_mig_obj, n_maj_compare \
+                        = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+                                                                    root_l=ii_maj_l,
+                                                                    n_leaves=n_leaves,
+                                                                    cut_computation_method=cut_computation_method,
+                                                                    if_allow_0contribution=False)
+                    if sat_flag:
+                        flag_continue = True
+                        # last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+                        current_pmig_obj = optimized_mig_obj
+                        print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l, n_maj_compare[0],
+                                                                                  n_maj_compare[1]))
+
+            cnt_round = cnt_round + 1
+        self.update_current_pmig(new_pmig=current_pmig_obj)
+            # last_optimized_root_l = None # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
+        #     for ii_maj_l in maj_list[::-1]:
+        #         if (last_optimized_root_l == None) or ( (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l) ):
+        #             # print("Node {}".format(ii_maj_l))
+        #             sat_flag, optimized_mig_obj, n_maj_compare \
+        #                 = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+        #                                                             root_l=ii_maj_l,
+        #                                                             n_leaves=n_leaves,
+        #                                                             cut_computation_method='rec_driven',
+        #                                                             if_allow_0contribution=False)
+        #             if sat_flag:
+        #                 flag_continue = True
+        #                 last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+        #                 current_pmig_obj = optimized_mig_obj
+        #                 print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l, n_maj_compare[0], n_maj_compare[1]))
+        #
+        #     cnt_round = cnt_round + 1
+        # self.update_current_pmig(new_pmig=current_pmig_obj)
+
+
+    # #######
+    # def opti_exact_synthesis_size_frompo_allow_0contribution(self, n_leaves):
+    #     '''
+    #     与opti_exact_synthesis_size_frompo不同的是，该方法允许0优化的替换。但是，是否继续下一轮仍然不考虑0优化的替换。
+    #
+    #     从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
+    #
+    #     :param n_leaves:
+    #     :return:
+    #     '''
+    #     # print('\n')
+    #     print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompo")
+    #
+    #     flag_continue = True
+    #     current_pmig_obj = self.get_current_pmig()
+    #     assert isinstance(current_pmig_obj, PMIG)
+    #     cnt_round = 1
+    #     cnt_0contri_only = 0 # 如果一轮中仅有0优化的替换，该变量加一。该变量用于指示是否连续几轮都是只有0优化的替换
+    #     while flag_continue or (cnt_0contri_only < 2):
+    #         print("ROUND {}, cnt:{}".format(cnt_round, cnt_0contri_only))
+    #         flag_continue = False
+    #         maj_list = list(current_pmig_obj.get_iter_majs())
+    #         last_optimized_root_l = None  # 用于记录上一个被优化的割集的root。由于优化后该root对应node的literal会减小，因此用此变量跳过在该root之上的nodes。
+    #         for ii_maj_l in maj_list[::-1]:
+    #             if (last_optimized_root_l == None) or (
+    #                     (last_optimized_root_l != None) and (ii_maj_l < last_optimized_root_l)):
+    #                 # print("Node {}".format(ii_maj_l))
+    #                 # if cnt_0contri_only == 0:
+    #                 #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+    #                 #         = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
+    #                 #                                                                         n_leaves=n_leaves)
+    #                 # else:
+    #                 #     sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+    #                 #         = PMIG_operator.op_cut_exact_synthesis_size_allow_0contribution(pmig_obj_r=current_pmig_obj, root_l=ii_maj_l,
+    #                 #                                                     n_leaves=n_leaves)
+    #                 sat_flag, new_pmig, optimized_mig_obj, n_maj_compare, new_literal_of_root, info_tuple_cut, info_tuple_model \
+    #                     = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+    #                                                                                     root_l=ii_maj_l,
+    #                                                                                     n_leaves=n_leaves,
+    #                                                                                     cut_computation_method='rec_driven',
+    #                                                                                     if_allow_0contribution=True)
+    #                 if sat_flag:
+    #                     assert n_maj_compare[0] >= n_maj_compare[1]
+    #                     if n_maj_compare[0] > n_maj_compare[1]:
+    #                         flag_continue = True
+    #                         print("-------- Positive optimization! ------->")
+    #                     last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+    #                     current_pmig_obj = optimized_mig_obj
+    #                     print("Round {}, Root {} - 已替换，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,
+    #                                                                               n_maj_compare[0],
+    #                                                                               n_maj_compare[1]))
+    #
+    #         if flag_continue:
+    #             cnt_0contri_only = 0
+    #         else:
+    #             cnt_0contri_only = cnt_0contri_only + 1
+    #         cnt_round = cnt_round + 1
+    #     self.update_current_pmig(new_pmig=current_pmig_obj)
+
+#######
+    def opti_exact_synthesis_size_frompi_allow_0contribution(self, n_leaves, cut_computation_method = 'rec_driven'):
+        '''
+        从上到下的exact synthesis。在使用该方法前请先使用opti_clean_irrelevant_nodes()方法对nodes进行排序。
+
+        :param n_leaves:
+        :return:
+        '''
+        # print('\n')
+        print(">>> [PMIG_optimization] opti_exact_synthesis_size_frompi")
+
+        cnt_0opti = -1
+        max_0opti = 2
+        flag_continue = True
+        current_pmig_obj = self.get_current_pmig()
+        assert isinstance(current_pmig_obj, PMIG)
+        cnt_round = 1
+        while flag_continue or (cnt_0opti <= max_0opti):
+            cnt_0opti = cnt_0opti + 1
+            print("ROUND {}, cnt_0opti={}".format(cnt_round, cnt_0opti))
+            flag_continue = False
+            maj_list = list(current_pmig_obj.get_iter_majs())
+            for ii_maj_l in maj_list[::1]:
+                if (not flag_continue):
+                    # print("Node {}".format(ii_maj_l))
+                    sat_flag, optimized_mig_obj, n_maj_compare \
+                        = PMIG_operator.op_cut_exact_synthesis_size(pmig_obj_r=current_pmig_obj,
+                                                                    root_l=ii_maj_l,
+                                                                    n_leaves=n_leaves,
+                                                                    cut_computation_method=cut_computation_method,
+                                                                    if_allow_0contribution=True)
+                    if sat_flag:
+                        if n_maj_compare[0] > n_maj_compare[1]:
+                            cnt_0opti = -1
+                            flag_continue = True
+                        else:
+                            assert n_maj_compare[0] == n_maj_compare[1]
+                        # last_optimized_root_l = PMIG.get_noattribute_literal(f=new_literal_of_root)
+                        current_pmig_obj = optimized_mig_obj
+                        print("Round {}, Root {} - 已优化，{} MAJs -> {} MAJs".format(cnt_round, ii_maj_l,
+                                                                                  n_maj_compare[0],
+                                                                                  n_maj_compare[1]))
+
+            cnt_round = cnt_round + 1
+        self.update_current_pmig(new_pmig=current_pmig_obj)
 
 
 
