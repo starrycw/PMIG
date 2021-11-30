@@ -1,8 +1,7 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @Time    : 2021/11/11
+# @Time    : 2021/11/30
 # @Author  : c
-# @File    : benchmark_LGSynth91_MultitaskAuto.py
 
 import sys
 import time
@@ -22,21 +21,24 @@ from pmig import pmig_ops
 from pmig import pmig_logic
 from pmig import exact_synthesis as ex_syn
 from pmig import graphs_polymorphic
-
-
-
-
+import benchmark_optimization_methods
 
 ################################################
 # 在这里指定任务
 list_tasks_to_be_exec = (
     #(task_id, task_type, task_opti_method task_n_leaves)
-    (1, 'pedge', 'size_default', 4),
-    (1, 'pnode', 'size_default', 4)
+    (9, 'pedge', 'size_default', 4),
+    (9, 'pnode', 'size_default', 4)
 )
 
 # 在这里设置随机验证的数量
 task_n_random_veri = 50
+
+# Optimization for sub-graphs A and B
+opti_method_sub_graphs = 'pi_to_po_size_default'
+
+# Optimization for muxed graph
+opti_method_muxed_graphs = 'po_to_pi_size_default'
 
 
 ################################################
@@ -65,10 +67,6 @@ result_of_each_task = []
 
 # 存储结果的文件夹名称
 now_time_str = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-
-
-
-
 
 ################################################
 for task_to_be_exec in list_tasks_to_be_exec:
@@ -102,16 +100,26 @@ for task_to_be_exec in list_tasks_to_be_exec:
     aig_1.fill_pi_names()
     aig_1.fill_po_names()
 
-    mig_1 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_1, echo_mode=1)
-    print(mig_1)
+    mig_1_raw = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_1, echo_mode=1)
+    print(mig_1_raw)
 
     path_abc_srcfile = input_file_list[task_id - 1][1]
     aig_2 = graphs_io.read_aiger(path_abc_srcdir + '/' + path_abc_srcfile + '.aig')
     aig_2.fill_pi_names()
     aig_2.fill_po_names()
 
-    mig_2 = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_2, echo_mode=1)
-    print(mig_2)
+    mig_2_raw = graphs.PMIG.convert_aig_to_pmig(aig_obj=aig_2, echo_mode=1)
+    print(mig_2_raw)
+
+    # Opti sub-migs
+
+    mig_1 = benchmark_optimization_methods.exact_synthesis_combination.run_es(method_str=opti_method_sub_graphs,
+        pmig_raw_obj=mig_1_raw, task_n_leaves=task_n_leaves, task_name='sub1 of {}'.format(task_to_be_exec))
+    mig_2 = benchmark_optimization_methods.exact_synthesis_combination.run_es(method_str=opti_method_sub_graphs,
+        pmig_raw_obj=mig_2_raw, task_n_leaves=task_n_leaves, task_name='sub2 of {}'.format(task_to_be_exec))
+
+
+
 
     pmig_gen_pnode = graphs_polymorphic.PMIG_Gen_Comb_2to1_PNode()
     pmig_gen_pnode.initialization(mig1=mig_1, mig2=mig_2)
@@ -130,88 +138,27 @@ for task_to_be_exec in list_tasks_to_be_exec:
     # print(mig_pedge)
 
     if task_type == 'pedge':
-        opti_obj = pmig_ops.PMIG_optimization()
-        opti_obj.initialization(mig_obj=mig_pedge, n_random_veri=task_n_random_veri)
-        opti_obj.opti_clean_pos_by_type()
-        opti_obj.opti_clean_irrelevant_nodes()
+        opti_obj_temp = pmig_ops.PMIG_optimization()
+        opti_obj_temp.initialization(mig_obj=mig_pedge, n_random_veri=task_n_random_veri)
+        opti_obj_temp.opti_clean_pos_by_type()
+        opti_obj_temp.opti_clean_irrelevant_nodes()
 
     elif task_type == 'pnode':
-        opti_obj = pmig_ops.PMIG_optimization()
-        opti_obj.initialization(mig_obj=mig_pnode, n_random_veri=task_n_random_veri)
-        opti_obj.opti_clean_pos_by_type()
-        opti_obj.opti_clean_irrelevant_nodes()
+        opti_obj_temp = pmig_ops.PMIG_optimization()
+        opti_obj_temp.initialization(mig_obj=mig_pnode, n_random_veri=task_n_random_veri)
+        opti_obj_temp.opti_clean_pos_by_type()
+        opti_obj_temp.opti_clean_irrelevant_nodes()
 
     else:
         assert False
+
+    pmig_obj_muxed_raw = opti_obj_temp.get_current_pmig()
 
     # 优化策略
-    if task_opti_method == 'size_default':
-        cnt_opti_cycle = 0
-        flag_continue = True
-        while flag_continue:
-            cnt_opti_cycle = cnt_opti_cycle + 1
-            flag_continue = False
-            temp_current_pmig_obj = opti_obj.get_current_pmig()
-            assert isinstance(temp_current_pmig_obj, graphs.PMIG)
-            temp_current_pmig_size = temp_current_pmig_obj.n_majs()
 
-            # 每轮执行的操作 PI-PO
-            print("############################################################################################")
-            print('TASK {}, Cycle {}, rec_driven'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompi(n_leaves=task_n_leaves, cut_computation_method='rec_driven')
-            opti_obj.opti_clean_irrelevant_nodes()
+    pmig_obj_opti = benchmark_optimization_methods.exact_synthesis_combination.run_es(method_str=opti_method_muxed_graphs,
+        pmig_raw_obj=pmig_obj_muxed_raw, task_n_leaves=task_n_leaves, task_name=task_to_be_exec)
 
-            print("############################################################################################")
-            print('TASK {}, Cycle {}, rec_driven, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompi_allow_0contribution(n_leaves=task_n_leaves, cut_computation_method='rec_driven')
-            opti_obj.opti_clean_irrelevant_nodes()
-
-            print("############################################################################################")
-            print('TASK {}, Cycle {}, rec_driven_mfc'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompi(n_leaves=task_n_leaves, cut_computation_method='rec_driven_mfc')
-            opti_obj.opti_clean_irrelevant_nodes()
-
-            print("############################################################################################")
-            print('TASK {}, Cycle {}, rec_driven_mfc, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompi_allow_0contribution(n_leaves=task_n_leaves, cut_computation_method='rec_driven_mfc')
-            opti_obj.opti_clean_irrelevant_nodes()
-
-            # 每轮执行的操作 PO-PI
-            print("############################################################################################")
-            print('TASK {}, Cycle {}, rec_driven'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompo(n_leaves=task_n_leaves, cut_computation_method='rec_driven')
-            opti_obj.opti_clean_irrelevant_nodes()
-
-            print("############################################################################################")
-            print('TASK {}, Cycle {}, rec_driven, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompo_allow_0contribution(n_leaves=task_n_leaves,
-                                                                          cut_computation_method='rec_driven')
-            opti_obj.opti_clean_irrelevant_nodes()
-
-            print("############################################################################################")
-            print('TASK {}, Cycle {}, rec_driven_mfc'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompo(n_leaves=task_n_leaves, cut_computation_method='rec_driven_mfc')
-            opti_obj.opti_clean_irrelevant_nodes()
-
-            print("############################################################################################")
-            print('TASK {}, Cycle {}, rec_driven_mfc, allow 0 contribution'.format(task_to_be_exec, cnt_opti_cycle))
-            opti_obj.opti_exact_synthesis_size_frompo_allow_0contribution(n_leaves=task_n_leaves,
-                                                                          cut_computation_method='rec_driven_mfc')
-            opti_obj.opti_clean_irrelevant_nodes()
-
-            # 检查这一轮是否有优化
-            temp_new_pmig_obj = opti_obj.get_current_pmig()
-            assert isinstance(temp_new_pmig_obj, graphs.PMIG)
-            temp_new_pmig_size = temp_new_pmig_obj.n_majs()
-            print("############################################################################################")
-            print("Cycle {} finished! MIG nodes: {} -> {}".format(cnt_opti_cycle, temp_current_pmig_size, temp_new_pmig_size))
-            if temp_new_pmig_size < temp_current_pmig_size:
-                flag_continue = True
-            else:
-                assert temp_new_pmig_size == temp_current_pmig_size
-
-    else:
-        assert False
 
     # 保存结果
 
@@ -221,7 +168,6 @@ for task_to_be_exec in list_tasks_to_be_exec:
         pmig_writer_mig_pedge.write_to_file(f_name='mig_pedge.pmig', f_path=f_path)
         info_pmig_raw = copy.deepcopy(mig_pedge)
 
-        pmig_obj_opti = opti_obj.get_current_pmig()
         pmig_writer_mig_opti = graphs_io.pmig_writer(pmig_obj=pmig_obj_opti)
         f_path = path_abc_resultdir_current
         pmig_writer_mig_opti.write_to_file(f_name='mig_pedge_opti_{}_{}_{}.pmig'.format(task_type, task_opti_method, task_n_leaves), f_path=f_path)
@@ -233,7 +179,6 @@ for task_to_be_exec in list_tasks_to_be_exec:
         pmig_writer_mig_pnode.write_to_file(f_name='mig_pnode.pmig', f_path=f_path)
         info_pmig_raw = copy.deepcopy(mig_pnode)
 
-        pmig_obj_opti = opti_obj.get_current_pmig()
         pmig_writer_mig_opti = graphs_io.pmig_writer(pmig_obj=pmig_obj_opti)
         f_path = path_abc_resultdir_current
         pmig_writer_mig_opti.write_to_file(f_name='mig_pnode_opti_{}_{}_{}.pmig'.format(task_type, task_opti_method, task_n_leaves), f_path=f_path)
@@ -242,13 +187,13 @@ for task_to_be_exec in list_tasks_to_be_exec:
 
     pmig_writer_mig1 = graphs_io.pmig_writer(pmig_obj=mig_1)
     f_path = path_abc_resultdir_current
-    pmig_writer_mig1.write_to_file(f_name='mig_1.pmig', f_path=f_path)
+    pmig_writer_mig1.write_to_file(f_name='optimized_mig_1.pmig', f_path=f_path)
 
     pmig_writer_mig2 = graphs_io.pmig_writer(pmig_obj=mig_2)
     f_path = path_abc_resultdir_current
-    pmig_writer_mig2.write_to_file(f_name='mig_2.pmig', f_path=f_path)
+    pmig_writer_mig2.write_to_file(f_name='optimized_mig_2.pmig', f_path=f_path)
 
-    info_taskinfo = copy.deepcopy(task_to_be_exec)
+    info_taskinfo = (copy.deepcopy(task_to_be_exec), opti_method_sub_graphs, opti_method_muxed_graphs)
     info_tuple_current = (info_taskinfo, info_pmig_raw, info_pmig_optimized)
     result_of_each_task.append(copy.deepcopy(info_tuple_current))
 

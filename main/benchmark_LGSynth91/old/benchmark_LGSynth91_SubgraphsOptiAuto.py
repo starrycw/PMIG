@@ -12,7 +12,7 @@ import datetime
 
 import pmig.graphs
 
-sys.path.append("..")
+sys.path.append("../..")
 import global_vars as g_vars
 g_vars._init()
 # from pmig import convert_to_graph
